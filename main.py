@@ -83,6 +83,7 @@ def observeData(browser):
 if __name__ == '__main__':
     option = Options()
     option.add_argument("--disable-infobars")
+    option.headless = True
     browser = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=option)
     browser.get('http://www.vybory.izbirkom.ru/region/izbirkom')
     observeData(browser)
