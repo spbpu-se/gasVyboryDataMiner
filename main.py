@@ -12,6 +12,8 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 pytesseract.pytesseract.tesseract_cmd = "D:\\Tesseract\\tesseract.exe"
 
+DEBUG = True
+
 
 def solveCaptcha(browser):
     try:
@@ -49,12 +51,26 @@ def parseTableByXPATH(browser, xpath):
     print('-----------------------------------------------------')
 
 
+def parseCandidates(browser):
+    table = browser.find_elements(by=By.XPATH, value='//*[@id="candidates-221-2"]/tbody/tr/td/nobr/a')
+    table2 = browser.find_elements(by=By.XPATH, value='//*[@id="candidates-220-2"]/tbody/tr/td/nobr/a')
+    actual_table = table if not None else table2
+    parseTableByXPATH(browser, actual_table)
+    tableArr = []
+    for _ in actual_table:
+        tableArr.append(_.get_attribute('href'))
+    for _ in tableArr:
+        browser.get(_)
+        solveCaptcha(browser)
+        parseTableByXPATH(browser, '//*[@id="report-body col"]/div[10]/div/div[2]/table')
+
+
 def observeData(browser):
     data_filter = browser.find_element(by=By.CSS_SELECTOR, value="span.filter")
     data_filter.click()
     WebDriverWait(browser, 1).until(EC.presence_of_element_located((By.ID, "start_date")))
     start_date = browser.find_element(by=By.ID, value="start_date")
-    # browser.implicitly_wait(1)
+    browser.implicitly_wait(1)
     start_date.clear()
     start_date.send_keys("01.01.2022")
     end_date = browser.find_element(by=By.ID, value="end_date")
@@ -67,14 +83,23 @@ def observeData(browser):
     linkArr = []
     for link in links:
         linkArr.append(link.get_attribute('href'))
+    print("links are stacked!")
     for link in linkArr:
         browser.get(link)
         solveCaptcha(browser)
+        browser.find_element(by=By.LINK_TEXT, value="Результаты выборов").click()
+        solveCaptcha(browser)
+        if browser.find_element(by=By.XPATH,
+                                value='//*[@id="election-results"]/table/tbody/tr/td/a').text != "Результаты выборов":
+            continue
+        browser.find_element(by=By.XPATH, value='//*[@id="election-results"]/table/tbody/tr/td/a').click()
+        solveCaptcha(browser)
+        parseTableByXPATH(browser, '//*[@id="report-body col"]/div[10]/div/div[2]/table')
         browser.find_element(by=By.ID, value="standard-reports-name").click()
         solveCaptcha(browser)
         browser.find_element(by=By.LINK_TEXT, value="Сведения о кандидатах").click()
         solveCaptcha(browser)
-        browser.find_element(by=By.LINK_TEXT, value="Результаты выборов").click()
+        parseCandidates(browser)
         solveCaptcha(browser)
 
 
@@ -82,7 +107,7 @@ if __name__ == '__main__':
     option = Options()
     option.add_argument("--disable-infobars")
     option.add_argument("--disable-blink-features=AutomationControlled")
-    option.headless = True
+    option.headless = not DEBUG
     browser = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=option)
     browser.get('http://www.vybory.izbirkom.ru/region/izbirkom')
     observeData(browser)
