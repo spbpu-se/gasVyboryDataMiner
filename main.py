@@ -1,18 +1,11 @@
-import os
-
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-import pandas as pd
 from time import sleep
 import pytesseract
-import sys
-import argparse
 from PIL import Image
-from subprocess import check_output
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
@@ -39,17 +32,21 @@ def solveCaptcha(browser):
             browser.find_element(by=By.ID, value="captcha").send_keys(captch)
             browser.find_element(by=By.CLASS_NAME, value="button-send").click()
             print("captcha is solved!")
-            browser.implicitly_wait(5)
     except (StaleElementReferenceException, NoSuchElementException):
         pass
 
 
-def captcha(func):
-    def wrapper(*arg, **kwarg):
-        solveCaptcha(browser)
-        func(*arg, **kwarg)
-
-    return wrapper
+def parseTableByXPATH(browser, xpath):
+    table = browser.find_element(by=By.XPATH,
+                                 value=xpath)
+    rows_table = table.find_elements(by=By.TAG_NAME, value="tr")
+    for row in rows_table:
+        columns_table = row.find_elements(by=By.TAG_NAME, value="td")
+        for column in columns_table:
+            if column.text == '':
+                print("null")
+            print(column.text)
+    print('-----------------------------------------------------')
 
 
 def observeData(browser):
@@ -57,7 +54,7 @@ def observeData(browser):
     data_filter.click()
     WebDriverWait(browser, 1).until(EC.presence_of_element_located((By.ID, "start_date")))
     start_date = browser.find_element(by=By.ID, value="start_date")
-    browser.implicitly_wait(1)
+    # browser.implicitly_wait(1)
     start_date.clear()
     start_date.send_keys("01.01.2022")
     end_date = browser.find_element(by=By.ID, value="end_date")
@@ -78,11 +75,13 @@ def observeData(browser):
         browser.find_element(by=By.LINK_TEXT, value="Сведения о кандидатах").click()
         solveCaptcha(browser)
         browser.find_element(by=By.LINK_TEXT, value="Результаты выборов").click()
+        solveCaptcha(browser)
 
 
 if __name__ == '__main__':
     option = Options()
     option.add_argument("--disable-infobars")
+    option.add_argument("--disable-blink-features=AutomationControlled")
     option.headless = True
     browser = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=option)
     browser.get('http://www.vybory.izbirkom.ru/region/izbirkom')
