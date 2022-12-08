@@ -52,10 +52,12 @@ def parseTableByXPATH(browser, xpath):
 
 
 def parseCandidates(browser):
-    table = browser.find_elements(by=By.XPATH, value='//*[@id="candidates-221-2"]/tbody/tr/td/nobr/a')
-    table2 = browser.find_elements(by=By.XPATH, value='//*[@id="candidates-220-2"]/tbody/tr/td/nobr/a')
+    links = ['//*[@id="candidates-221-2"]/tbody/tr/td/nobr/a', '//*[@id="candidates-220-2"]/tbody/tr/td/nobr/a']
+    tables = ['//*[@id="candidates-221-2"]/tbody', '//*[@id="candidates-220-2"]/tbody']
+    table = browser.find_elements(by=By.XPATH, value=links[0])
+    table2 = browser.find_elements(by=By.XPATH, value=links[1])
     actual_table = table if not None else table2
-    parseTableByXPATH(browser, actual_table)
+    parseTableByXPATH(browser, tables[0] if table is not None else tables[1])
     tableArr = []
     for _ in actual_table:
         tableArr.append(_.get_attribute('href'))
@@ -75,7 +77,7 @@ def observeData(browser):
     start_date.send_keys("01.01.2022")
     end_date = browser.find_element(by=By.ID, value="end_date")
     end_date.clear()
-    end_date.send_keys("01.01.2023")
+    end_date.send_keys("01.03.2022")
     browser.find_element(by=By.ID, value="calendar-btn-search").click()
     solveCaptcha(browser)
     links = browser.find_elements(by=By.XPATH, value="//a[@href]")
