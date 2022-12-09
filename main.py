@@ -109,6 +109,7 @@ def observeData(browser):
         browser.find_element(by=By.LINK_TEXT, value="Сведения о кандидатах").click()
         solveCaptcha(browser)
         parseCandidates(browser, current_json)
+        solveCaptcha(browser)
 
 
 if __name__ == '__main__':
