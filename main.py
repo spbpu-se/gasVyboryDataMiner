@@ -9,6 +9,8 @@ from PIL import Image
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
+import jsons
+import jsonpickle
 
 pytesseract.pytesseract.tesseract_cmd = "D:\\Tesseract\\tesseract.exe"
 
@@ -38,33 +40,37 @@ def solveCaptcha(browser):
         pass
 
 
-def parseTableByXPATH(browser, xpath):
+def parseTableByXPATH(browser, xpath, json, type='election-results'):
     table = browser.find_element(by=By.XPATH,
                                  value=xpath)
+    raw_data = []
     rows_table = table.find_elements(by=By.TAG_NAME, value="tr")
     for row in rows_table:
         columns_table = row.find_elements(by=By.TAG_NAME, value="td")
         for column in columns_table:
             if column.text == '':
-                print("null")
-            print(column.text)
-    print('-----------------------------------------------------')
+                raw_data.append("null")
+            raw_data.append(column.text)
+    print(raw_data)
+    if type == 'election-results':
+
+        pass
 
 
-def parseCandidates(browser):
+def parseCandidates(browse, json):
     links = ['//*[@id="candidates-221-2"]/tbody/tr/td/nobr/a', '//*[@id="candidates-220-2"]/tbody/tr/td/nobr/a']
     tables = ['//*[@id="candidates-221-2"]/tbody', '//*[@id="candidates-220-2"]/tbody']
     table = browser.find_elements(by=By.XPATH, value=links[0])
     table2 = browser.find_elements(by=By.XPATH, value=links[1])
     actual_table = table if not None else table2
-    parseTableByXPATH(browser, tables[0] if table is not None else tables[1])
+    parseTableByXPATH(browser, tables[0] if table is not None else tables[1], json)
     tableArr = []
     for _ in actual_table:
         tableArr.append(_.get_attribute('href'))
     for _ in tableArr:
         browser.get(_)
         solveCaptcha(browser)
-        parseTableByXPATH(browser, '//*[@id="report-body col"]/div[10]/div/div[2]/table')
+        parseTableByXPATH(browser, '//*[@id="report-body col"]/div[10]/div/div[2]/table', json)
 
 
 def observeData(browser):
@@ -94,14 +100,15 @@ def observeData(browser):
         if browser.find_element(by=By.XPATH,
                                 value='//*[@id="election-results"]/table/tbody/tr/td/a').text != "Результаты выборов":
             continue
+        current_json = jsons.Json()
         browser.find_element(by=By.XPATH, value='//*[@id="election-results"]/table/tbody/tr/td/a').click()
         solveCaptcha(browser)
-        parseTableByXPATH(browser, '//*[@id="report-body col"]/div[10]/div/div[2]/table')
+        parseTableByXPATH(browser, '//*[@id="report-body col"]/div[10]/div/div[2]/table', current_json)
         browser.find_element(by=By.ID, value="standard-reports-name").click()
         solveCaptcha(browser)
         browser.find_element(by=By.LINK_TEXT, value="Сведения о кандидатах").click()
         solveCaptcha(browser)
-        parseCandidates(browser)
+        parseCandidates(browser, current_json)
 
 
 if __name__ == '__main__':
