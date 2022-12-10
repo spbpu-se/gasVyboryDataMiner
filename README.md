@@ -8,7 +8,7 @@
 {
   "vrn" : 100000000000000,
   "title" : "Выборы совета депутатов городского поселения Шумиловский городок",
-  "level" : "local / regional / federal",
+  "level" : "local / regional / regional_capital / federal",
   "date" : "11.01.2021",
   "results" : [
     {
