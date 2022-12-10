@@ -11,15 +11,25 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 import jsons
 import jsonpickle
+from urllib.parse import urlparse, parse_qs
+import re
 
 pytesseract.pytesseract.tesseract_cmd = "D:\\Tesseract\\tesseract.exe"
 
 DEBUG = True
+election_levels = {
+    "federal": '//*[@id="select2-urovproved-result-gyua-1"]',
+    "regional": '//*[@id="select2-urovproved-result-q3ub-2"]',
+    "regional_capital": '//*[@id="select2-urovproved-result-aftx-3"]',
+    "local": '//*[@id="select2-urovproved-result-5sgy-4"]'
+}
 
 
 def solveCaptcha(browser):
     try:
         while True:
+            if 'DDoS' in browser.current_url():
+                browser.back()
             check = browser.find_elements(by=By.ID, value="captchaImg")
             if len(check) == 0:
                 break
@@ -51,13 +61,11 @@ def parseTableByXPATH(browser, xpath, json, type='election-results'):
             if column.text == '':
                 raw_data.append("null")
             raw_data.append(column.text)
-    print(raw_data)
     if type == 'election-results':
-
         pass
 
 
-def parseCandidates(browse, json):
+def parseCandidates(browser, json):
     links = ['//*[@id="candidates-221-2"]/tbody/tr/td/nobr/a', '//*[@id="candidates-220-2"]/tbody/tr/td/nobr/a']
     tables = ['//*[@id="candidates-221-2"]/tbody', '//*[@id="candidates-220-2"]/tbody']
     table = browser.find_elements(by=By.XPATH, value=links[0])
@@ -74,42 +82,62 @@ def parseCandidates(browse, json):
 
 
 def observeData(browser):
-    data_filter = browser.find_element(by=By.CSS_SELECTOR, value="span.filter")
-    data_filter.click()
-    WebDriverWait(browser, 1).until(EC.presence_of_element_located((By.ID, "start_date")))
-    start_date = browser.find_element(by=By.ID, value="start_date")
-    browser.implicitly_wait(1)
-    start_date.clear()
-    start_date.send_keys("01.01.2022")
-    end_date = browser.find_element(by=By.ID, value="end_date")
-    end_date.clear()
-    end_date.send_keys("01.03.2022")
-    browser.find_element(by=By.ID, value="calendar-btn-search").click()
-    solveCaptcha(browser)
-    links = browser.find_elements(by=By.XPATH, value="//a[@href]")
-    links = links[26:]
-    linkArr = []
-    for link in links:
-        linkArr.append(link.get_attribute('href'))
-    print("links are stacked!")
-    for link in linkArr:
-        browser.get(link)
+    for level in election_levels:
+        data_filter = browser.find_element(by=By.CSS_SELECTOR, value="span.filter")
+        data_filter.click()
+        WebDriverWait(browser, 1).until(EC.presence_of_element_located((By.ID, "start_date")))
+        start_date = browser.find_element(by=By.ID, value="start_date")
+        browser.implicitly_wait(1)
+        start_date.clear()
+        start_date.send_keys("01.01.2022")
+        end_date = browser.find_element(by=By.ID, value="end_date")
+        end_date.clear()
+        end_date.send_keys("01.03.2022")
+        browser.find_element(by=By.XPATH,
+                             value='//*[@id="search_form"]/div/div[2]/div[1]/span/span[1]/span/span/textarea').click()
+        browser.find_element(by=By.XPATH, value=election_levels[level]).click()
+        browser.find_element(by=By.ID, value="calendar-btn-search").click()
         solveCaptcha(browser)
-        browser.find_element(by=By.LINK_TEXT, value="Результаты выборов").click()
-        solveCaptcha(browser)
-        if browser.find_element(by=By.XPATH,
-                                value='//*[@id="election-results"]/table/tbody/tr/td/a').text != "Результаты выборов":
-            continue
-        current_json = jsons.Json()
-        browser.find_element(by=By.XPATH, value='//*[@id="election-results"]/table/tbody/tr/td/a').click()
-        solveCaptcha(browser)
-        parseTableByXPATH(browser, '//*[@id="report-body col"]/div[10]/div/div[2]/table', current_json)
-        browser.find_element(by=By.ID, value="standard-reports-name").click()
-        solveCaptcha(browser)
-        browser.find_element(by=By.LINK_TEXT, value="Сведения о кандидатах").click()
-        solveCaptcha(browser)
-        parseCandidates(browser, current_json)
-        solveCaptcha(browser)
+        links = browser.find_elements(by=By.XPATH, value="//a[@href]")
+        links = links[26:]
+        linkArr = []
+        for link in links:
+            linkArr.append(link.get_attribute('href'))
+        print("all %i links are stacked!" % (len(linkArr)))
+        for link in linkArr:
+            print(link)
+            browser.get(link)
+            solveCaptcha(browser)
+            browser.find_element(by=By.LINK_TEXT, value="Результаты выборов").click()
+            solveCaptcha(browser)
+            if browser.find_element(by=By.XPATH,
+                                    value='//*[@id="election-results"]/table/tbody/tr/td/a').text not in (
+            "Результаты выборов"):
+                continue
+
+            current_json_vrn = jsons.JsonVrn()
+
+            current_json_vrn.vrn = int(parse_qs(urlparse(browser.current_url).query)[bytes('vrn')][0])
+            current_json_vrn.title = browser.find_element(by=By.XPATH, value='//*[@id="election-title"]').text.split('\n')[0]
+            current_json_vrn.level = level
+            current_json_vrn.date = browser.find_element(by=By.XPATH, value='//*[@id="report-body col"]/div[10]/div/table[1]/tbody/tr/td').text.split('&nbsp; ')[1]
+
+            json_str = jsonpickle.encode(current_json_vrn)
+            with open(str(current_json_vrn.vrn) + ".json", "w") as f:
+                f.write(json_str)
+                f.close()
+
+            browser.find_element(by=By.XPATH, value='//*[@id="election-results"]/table/tbody/tr/td/a').click()
+            solveCaptcha(browser)
+            parseTableByXPATH(browser, '//*[@id="report-body col"]/div[10]/div/div[2]/table')
+
+            browser.find_element(by=By.ID, value="standard-reports-name").click()
+            solveCaptcha(browser)
+            browser.find_element(by=By.LINK_TEXT, value="Сведения о кандидатах").click()
+            solveCaptcha(browser)
+            parseCandidates(browser)
+            solveCaptcha(browser)
+        browser.get('http://www.vybory.izbirkom.ru/region/izbirkom')
 
 
 if __name__ == '__main__':

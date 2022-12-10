@@ -1,5 +1,5 @@
 class CandidatesResults:
-    def __init__(self, candidate_id=0, result=0):
+    def __init__(self, candidate_id=None, result=0):
         self.candidate_id = candidate_id
         self.result = result
 
