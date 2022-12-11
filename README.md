@@ -12,12 +12,11 @@
   },
   {
     "vrn": 100000000000000,
-    "district_id": 0,
-    "district_name": "Сасный округ"
+    "oik_id": 0,
   },
   {
     "vrn": 100000000000000,
-    "district_id": 0,
+    "oik_id": 0,
     "candidate_id": 0,
     "name": "Зубенко Михаил Петрович",
     "dob": "10.01.1960",
@@ -37,8 +36,8 @@
   },
   {
     "vrn": 100000000000000,
-    "district_id": 0,
-    "comission_id": 755,
+    "oik_id": 0,
+    "uik_id": 755,
     "total_voters": 1488,
     "recieved_ballots": 1500,
     "issued_ballots_inside": 743,
