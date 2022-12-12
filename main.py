@@ -18,7 +18,7 @@ import re
 
 pytesseract.pytesseract.tesseract_cmd = "D:\\Tesseract\\tesseract.exe"
 
-DEBUG = True
+DEBUG = False
 
 election_levels = {
     "federal": '//*[starts-with(@id, "select2-urovproved-result-") and "1" = substring(@id, string-length(@id))]',
@@ -83,11 +83,11 @@ def solveCaptcha(browser):
     try:
         while True:
             if 'DDoS' in browser.current_url:
+                print("DDOS!")
                 browser.back()
             check = browser.find_elements(by=By.ID, value="captchaImg")
             if len(check) == 0:
                 break
-            print("captcha is found!")
             sleep(1)
             for _ in check:
                 _.screenshot('captcha.png')
@@ -96,7 +96,6 @@ def solveCaptcha(browser):
                 browser.refresh()
                 continue
             captch.rstrip()
-            print(captch)
             browser.find_element(by=By.ID, value="captcha").send_keys(captch)
             browser.find_element(by=By.CLASS_NAME, value="button-send").click()
             print("captcha is solved!")
@@ -212,14 +211,18 @@ def parseTableByXPATH(browser, xpath, type='results', table_format="221", jsn=No
 
 
 def parseCandidates(browser):
-    links = ['//*[@id="candidates-221-2"]/tbody/tr/td/a', '//*[@id="candidates-220-2"]/tbody/tr/td/a']
     tables = ['//*[@id="candidates-221-2"]/tbody', '//*[@id="candidates-220-2"]/tbody']
-    table = browser.find_elements(by=By.XPATH, value=links[0])
-    table2 = browser.find_elements(by=By.XPATH, value=links[1])
-    bln = len(table) > 0
+    table = browser.find_elements(by=By.XPATH, value='//*[@id="candidates-221-2"]/tbody/tr/td/a')
+    if len(table) <= 0:
+        table = browser.find_elements(by=By.XPATH, value='//*[@id="candidates-221-2"]/tbody/tr/td/nobr/a')
+    table2 = browser.find_elements(by=By.XPATH, value='//*[@id="candidates-220-2"]/tbody/tr/td/a')
+    if len(table2) <= 0:
+        table2 = browser.find_elements(by=By.XPATH, value='//*[@id="candidates-220-2"]/tbody/tr/td/nobr/a')
+    bln = len(browser.find_elements(by=By.XPATH, value=tables[0])) > 0
     current_json_candidates = parseTableByXPATH(browser, tables[0] if bln else tables[1],
                                                 type="candidates", table_format=("221" if bln else "220"))
     actual_table = table if len(table) > 0 else table2
+    actual_table = actual_table
     tableArr = []
     for _ in actual_table:
         tableArr.append(_.get_attribute('href'))
@@ -275,7 +278,6 @@ def observeData(browser):
             raw_candidates = parseCandidates(browser)
 
             # УИКи
-            print(link)
             browser.get(link)
             solveCaptcha(browser)
             date_of_vote = browser.find_element(by=By.XPATH, value='//*[@id="election-info"]/div/div[3]/div[2]/b').text
