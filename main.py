@@ -16,7 +16,7 @@ import json
 from urllib.parse import urlparse, parse_qs
 import re
 
-DEBUG = False
+DEBUG = True
 pytesseract.pytesseract.tesseract_cmd = "D:\\Tesseract\\tesseract.exe"
 
 election_levels = {
@@ -29,18 +29,12 @@ election_levels = {
 
 def goThroughUiks(browser, uik, json_candidates):
     if len(browser.find_elements(by=By.XPATH, value=uik + '/ul/li')) == 0:
-        # uik = uik[:-3] + "/a"
-        # links = browser.find_elements(by=By.XPATH, value=uik)
-        # linksArr = []
-        # for _ in links:
-        #     linksArr.append(_.get_attribute('href'))
-        # for _ in linksArr:
-        #     browser.get(_)
-        #     solveCaptcha(browser)
         candidates = {_['candidate_id']: _['name'] for _ in json_candidates}
         table = browser.find_element(by=By.CLASS_NAME, value='table-bordered')
         if table:
             current_json_results = parseTable(browser, table, 'results')
+            if os.path.exists(str("output/") + str(current_json_results["vrn"]) + str("_") + str(current_json_results["uik_id"]) + str(".json")):
+                return
             raw_candidates = current_json_results["candidates_results"][:]
             for i, cand in enumerate(raw_candidates):
                 for p_id, p_name in candidates.items():
@@ -264,7 +258,7 @@ def observeData(browser):
         start_date.send_keys("01.01.2022")
         end_date = browser.find_element(by=By.ID, value="end_date")
         end_date.clear()
-        end_date.send_keys("01.12.2022")
+        end_date.send_keys("01.02.2022")
         WebDriverWait(browser, 2).until(EC.presence_of_element_located(
             (By.XPATH, '//*[@id="search_form"]/div/div[2]/div[1]/span/span[1]/span/span/textarea')))
         browser.find_element(by=By.XPATH,
@@ -279,10 +273,11 @@ def observeData(browser):
         for link in links:
             linkArr.append(link.get_attribute('href'))
         print("all %i links are stacked!" % (len(linkArr)))
-
+        # linkArr = ['http://www.zabkray.vybory.izbirkom.ru/region/izbirkom?action=show&root=0&tvd=27520001430982&vrn=27520001430973&prver=0&pronetvd=null&region=92&sub_region=92&type=426&report_mode=null']
         for link in linkArr:
             # Кандидаты
             browser.get(link)
+            solveCaptcha(browser)
             print(link)
             WebDriverWait(browser, 1).until(EC.presence_of_element_located((By.ID, "standard-reports-name")))
             browser.find_element(by=By.ID, value="standard-reports-name").click()
@@ -300,7 +295,6 @@ def observeData(browser):
             raw_candidates = parseCandidates(browser)
             if raw_candidates == "continue":
                 continue
-
             # УИКи
             browser.get(link)
             solveCaptcha(browser)
