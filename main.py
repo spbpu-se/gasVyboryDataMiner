@@ -16,7 +16,7 @@ import json
 from urllib.parse import urlparse, parse_qs
 import re
 
-DEBUG = True
+DEBUG = False
 pytesseract.pytesseract.tesseract_cmd = "D:\\Tesseract\\tesseract.exe"
 
 election_levels = {
@@ -35,7 +35,7 @@ def goThroughUiks(browser, uik, json_candidates):
             if table.text == "":
                 return
             current_json_results = parseTable(browser, table, 'results')
-            if os.path.exists(str("output/") + str(current_json_results["vrn"]) + str("_") + str(current_json_results["uik_id"]) + str(".json")):
+            if os.path.exists(str("output/") + str(current_json_results["vrn"]) + str("_") + str(current_json_results["oik_id"]) + "_" + str(current_json_results["uik_id"]) + str(".json")):
                 return
             raw_candidates = current_json_results["candidates_results"][:]
             for i, cand in enumerate(raw_candidates):
@@ -43,7 +43,7 @@ def goThroughUiks(browser, uik, json_candidates):
                     if cand[0] == p_name:
                         current_json_results["candidates_results"][i] = {'candidate_id': p_id, 'result': int(cand[1])}
                         break
-            json_name = str(current_json_results["vrn"]) + str("_") + str(current_json_results["uik_id"])
+            json_name = str(current_json_results["vrn"]) + str("_") + str(current_json_results["oik_id"]) + "_" + str(current_json_results["uik_id"])
             saveJson(current_json_results, json_name)
 
             for candidate in json_candidates:
@@ -93,7 +93,6 @@ def solveCaptcha(browser):
             captch.rstrip()
             browser.find_element(by=By.ID, value="captcha").send_keys(captch)
             browser.find_element(by=By.CLASS_NAME, value="button-send").click()
-            print("captcha is solved!")
     except (StaleElementReferenceException, NoSuchElementException):
         pass
 
@@ -146,10 +145,9 @@ def parseTable(browser, table, type='results', table_format="221", jsn=None):
             inside_tik = True
         tens = [key for key in rows_data.keys() if len(key) == 3]
 
-        json = jsons.JsonVrnOik
-        json['vrn'] = getParameterFromQuery(browser, "vrn")
-        json['oik_id'] = getOik(browser)
-        saveJson(json, '_'.join(map(str, (json['vrn'], json['oik_id']))))
+        json_oik = jsons.JsonVrnOik
+        json_oik['vrn'] = getParameterFromQuery(browser, "vrn")
+        json_oik['oik_id'] = getOik(browser)
 
         json = jsons.JsonComission
         json["vrn"] = getParameterFromQuery(browser, "vrn")
@@ -184,6 +182,10 @@ def parseTable(browser, table, type='results', table_format="221", jsn=None):
                                                         tens[1]]) if before_flag is True else rows_data[
             "11"]) if inside_tik is False else rows_data["13"]
         json["candidates_results"] = rows_data["cand"]
+        if json["uik_id"] == json["oik_id"]:
+            json["uik_id"] = 0
+        json_oik["uik_id"] = json["uik_id"]
+        saveJson(json_oik, '_'.join(map(str, (json_oik['vrn'], json_oik['oik_id']))))
         return json
     if type == 'candidates':
         raw_rows_data = flatTo2DList(raw_data, (8 if table_format == "220" else 7))
@@ -275,7 +277,7 @@ def observeData(browser):
         for link in links:
             linkArr.append(link.get_attribute('href'))
         print("all %i links are stacked!" % (len(linkArr)))
-        # linkArr = ['http://www.zabkray.vybory.izbirkom.ru/region/izbirkom?action=show&root=0&tvd=27520001430982&vrn=27520001430973&prver=0&pronetvd=null&region=92&sub_region=92&type=426&report_mode=null']
+        # linkArr = ['http://www.vologod.vybory.izbirkom.ru/region/izbirkom?action=show&root_a=1&vrn=4354028286341&region=35&global=&type=0&prver=0&pronetvd=null']
         for link in linkArr:
             # Кандидаты
             browser.get(link)
