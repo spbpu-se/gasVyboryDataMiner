@@ -275,8 +275,13 @@ def observeData(browser, dates):
             browser.get(link)
             solveCaptcha(browser)
             print(link)
-            WebDriverWait(browser, 1).until(EC.presence_of_element_located((By.ID, "standard-reports-name")))
-            browser.find_element(by=By.ID, value="standard-reports-name").click()
+            if os.path.exists(str("output/") + str(getParameterFromQuery(browser, "vrn")) + str(".json")):
+                continue
+            reports_name = browser.find_element(by=By.ID, value="standard-reports-name")
+
+            if reports_name.is_displayed() is False:
+                continue
+            reports_name.click()
             solveCaptcha(browser)
             if browser.find_element(by=By.LINK_TEXT, value="Сведения о кандидатах"):
                 browser.find_element(by=By.LINK_TEXT, value="Сведения о кандидатах").click()
@@ -324,6 +329,7 @@ if __name__ == '__main__':
     option = Options()
     option.add_argument("--disable-infobars")
     option.add_argument("--disable-blink-features=AutomationControlled")
+
     option.headless = not DEBUG
     browser = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=option)
     browser.get('http://www.vybory.izbirkom.ru/region/izbirkom')
