@@ -18,7 +18,7 @@ import re
 import sys
 from sys import platform
 
-DEBUG = True
+DEBUG = False
 if platform == "win32":
     pytesseract.pytesseract.tesseract_cmd = "D:\\Tesseract\\tesseract.exe"
 
@@ -274,13 +274,12 @@ def observeData(browser, dates):
         # linkArr = ['http://www.vologod.vybory.izbirkom.ru/region/izbirkom?action=show&root_a=1&vrn=4354028286341&region=35&global=&type=0&prver=0&pronetvd=null']
         for link in linkArr:
             # Кандидаты
+            if os.path.exists(str("output/") + str(link.split('vrn=')[1].split('&')[0]) + str(".json")):
+                continue
             browser.get(link)
             solveCaptcha(browser)
             print(link)
-            if os.path.exists(str("output/") + str(getParameterFromQuery(browser, "vrn")) + str(".json")):
-                continue
             reports_name = browser.find_element(by=By.ID, value="standard-reports-name")
-
             if reports_name.is_displayed() is False:
                 continue
             reports_name.click()
