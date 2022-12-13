@@ -135,17 +135,17 @@ def parseTable(browser, table, type='results', table_format="221", jsn=None):
                 row_data[2] = row_data[2].split('\n')[0]
                 rows_data['cand'].append(row_data[1:])
             else:
-                rows_data[row_data[0]] = int(row_data[2])
+                rows_data[row_data[1]] = int(row_data[2])
 
         if "3" not in rows_data:
             rows_data["3"] = 0
 
-        before_flag = False
-        if "досрочно" in raw_rows_data[2][1]:
-            before_flag = True
-        inside_tik = False
-        if "досрочно " in raw_rows_data[3][1]:
-            inside_tik = True
+        # before_flag = False
+        # if "досрочно" in raw_rows_data[2][1]:
+        #     before_flag = True
+        # inside_tik = False
+        # if "досрочно " in raw_rows_data[3][1]:
+        #     inside_tik = True
         tens = [key for key in rows_data.keys() if len(key) == 3]
 
         json_oik = jsons.JsonVrnOik
@@ -153,6 +153,7 @@ def parseTable(browser, table, type='results', table_format="221", jsn=None):
         json_oik['oik_id'] = getOik(browser)
 
         json = jsons.JsonComission
+
         json["vrn"] = getParameterFromQuery(browser, "vrn")
         json["oik_id"] = getOik(browser)
         json["uik_id"] = int(str(re.findall(r'\d+', browser.find_element(by=By.XPATH,
@@ -160,30 +161,18 @@ def parseTable(browser, table, type='results', table_format="221", jsn=None):
                                      0]
                                  if browser.find_element(By.XPATH,
                                                          value='//*[@id="report-body col"]/div[10]/div/table[2]/tbody/tr/td[2]/b') else 0))
-        json["total_voters"] = rows_data["1"]
-        json["recieved_ballots"] = rows_data["2"]
-        json["issued_ballots_inside"] = json["issued_ballots_inside"] = (
-            ((rows_data["4"] if "4" in rows_data else 0) + (
-                rows_data["3"] if "3" in rows_data else 0)) if before_flag is True else rows_data[
-                "3"]) if inside_tik is False else rows_data["3"] + rows_data["4"] + rows_data["5"]
-        json["issued_ballots_outside"] = (
-            rows_data["5"] if before_flag is True else rows_data["4"]) if inside_tik is False else rows_data["6"]
-        json["not_used_ballots"] = (
-            rows_data["6"] if before_flag is True else rows_data["5"]) if inside_tik is False else rows_data["7"]
-        json["ballots_from_outside_boxes"] = (
-            rows_data["7"] if before_flag is True else rows_data["6"]) if inside_tik is False else rows_data["8"]
-        json["ballots_from_inside_boxes"] = (
-            rows_data["8"] if before_flag is True else rows_data["7"]) if inside_tik is False else rows_data["9"]
-        json["invalid_ballots"] = (
-            rows_data["9"] if before_flag is True else rows_data["8"]) if inside_tik is False else rows_data["10"]
-        json["lost_ballots"] = ((
-                                    rows_data["11"] if "11" in rows_data else rows_data[
-                                        tens[0]]) if before_flag is True else rows_data[
-            "10"]) if inside_tik is False else rows_data["12"]
-        json["not_counted_recieved_ballots"] = ((
-                                                    rows_data["12"] if "12" in rows_data else rows_data[
-                                                        tens[1]]) if before_flag is True else rows_data[
-            "11"]) if inside_tik is False else rows_data["13"]
+        json["total_voters"] = rows_data[[_ for _ in rows_data if "избирателей" in _][0]]
+        json["recieved_ballots"] = rows_data[[_ for _ in rows_data if "полученных" in _][0]]
+        before_counter = [rows_data[a] for a in [_ for _ in rows_data if "досрочно" in _]]
+        json["issued_ballots_inside"] = rows_data[[_ for _ in rows_data if "в помещении" in _][0]] + sum(
+            int(cnt) for cnt in before_counter)
+        json["issued_ballots_outside"] = rows_data[[_ for _ in rows_data if "вне помещения" in _][0]]
+        json["not_used_ballots"] = rows_data[[_ for _ in rows_data if "погашенных" in _][0]]
+        json["ballots_from_outside_boxes"] = rows_data[[_ for _ in rows_data if "в переносных ящиках" in _][0]]
+        json["ballots_from_inside_boxes"] = rows_data[[_ for _ in rows_data if "в стационарных ящиках" in _][0]]
+        json["invalid_ballots"] = rows_data[[_ for _ in rows_data if "недействительных" in _][0]]
+        json["lost_ballots"] = rows_data[[_ for _ in rows_data if "утраченных" in _][0]]
+        json["not_counted_recieved_ballots"] = rows_data[[_ for _ in rows_data if "не учтенных" in _][0]]
         json["candidates_results"] = rows_data["cand"]
         if json["uik_id"] == json["oik_id"]:
             json["uik_id"] = 0
