@@ -16,7 +16,6 @@ import json
 from urllib.parse import urlparse, parse_qs
 import re
 
-
 DEBUG = False
 
 election_levels = {
@@ -233,7 +232,7 @@ def parseCandidates(browser):
     if len(table2) <= 0:
         table2 = browser.find_elements(by=By.XPATH, value='//*[@id="candidates-220-2"]/tbody/tr/td/nobr/a')
     bln = len(browser.find_elements(by=By.XPATH, value=tables[0])) > 0
-    if (if len(table) <= 0 and len(table2) <= 0):
+    if len(table) <= 0 and len(table2) <= 0:
         return "continue"
     current_json_candidates = parseTableByXPATH(browser, tables[0] if bln else tables[1],
                                                 type="candidates", table_format=("221" if bln else "220"))
@@ -288,17 +287,18 @@ def observeData(browser):
             solveCaptcha(browser)
             if browser.find_element(by=By.LINK_TEXT, value="Сведения о кандидатах"):
                 browser.find_element(by=By.LINK_TEXT, value="Сведения о кандидатах").click()
-            else if browser.find_element(by=By.LINK_TEXT,
-                                     value="Сведения о кандидатах, выдвинутых по одномандатным (многомандатным) избирательным округам"):
-                browser.find_element(by=By.LINK_TEXT,
-                                     value="Сведения о кандидатах, выдвинутых по одномандатным (многомандатным) избирательным округам").click()
-                                     
+            else:
+                if browser.find_element(by=By.LINK_TEXT,
+                                        value="Сведения о кандидатах, выдвинутых по одномандатным (многомандатным) избирательным округам"):
+                    browser.find_element(by=By.LINK_TEXT,
+                                         value="Сведения о кандидатах, выдвинутых по одномандатным (многомандатным) избирательным округам").click()
+
             solveCaptcha(browser)
-            
+
             raw_candidates = parseCandidates(browser)
             if raw_candidates == "continue":
                 continue
-            
+
             # УИКи
             browser.get(link)
             solveCaptcha(browser)
@@ -307,7 +307,8 @@ def observeData(browser):
             solveCaptcha(browser)
             resBtn = browser.find_element(by=By.XPATH, value='//*[@id="election-results"]/table/tbody/tr/td/a')
             if resBtn.text not in (
-                    "Результаты выборов", "Результаты выборов по одномандатному (многомандатному) округу", "Данные о предварительных итогах голосования по одномандатному (многомандатному) округу"):
+                    "Результаты выборов", "Результаты выборов по одномандатному (многомандатному) округу",
+                    "Данные о предварительных итогах голосования по одномандатному (многомандатному) округу"):
                 continue
             else:
                 resBtn.click()
