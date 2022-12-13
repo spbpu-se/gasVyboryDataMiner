@@ -166,9 +166,9 @@ def parseTable(browser, table, type='results', table_format="221", jsn=None):
         json["total_voters"] = rows_data[[_ for _ in rows_data if "избирателей" in _][0]]
         json["recieved_ballots"] = rows_data[[_ for _ in rows_data if "полученных" in _][0]]
         before_counter = [rows_data[a] for a in [_ for _ in rows_data if "досрочно" in _]]
-        json["issued_ballots_inside"] = rows_data[[_ for _ in rows_data if "в помещении" in _ or "в УИК" in _ or "на избирательном участке" in _][0]] + sum(
+        json["issued_ballots_inside"] = rows_data[[_ for _ in rows_data if "в помещении" in _ or "в УИК" in _ or "на избирательном участке" in _ or "на участке" in _][0]] + sum(
             int(cnt) for cnt in before_counter)
-        json["issued_ballots_outside"] = rows_data[[_ for _ in rows_data if "вне помещения" in _ or "вне УИК" in _][0]]
+        json["issued_ballots_outside"] = rows_data[[_ for _ in rows_data if "вне помещения" in _ or "вне УИК" in _ or "вне участка" in _][0]]
         json["not_used_ballots"] = rows_data[[_ for _ in rows_data if "погашенных" in _][0]]
         json["ballots_from_outside_boxes"] = rows_data[[_ for _ in rows_data if "в переносных ящиках" in _][0]]
         json["ballots_from_inside_boxes"] = rows_data[[_ for _ in rows_data if "в стационарных ящиках" in _][0]]
