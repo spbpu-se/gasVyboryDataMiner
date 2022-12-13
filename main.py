@@ -17,6 +17,7 @@ from urllib.parse import urlparse, parse_qs
 import re
 
 DEBUG = False
+pytesseract.pytesseract.tesseract_cmd = "D:\\Tesseract\\tesseract.exe"
 
 election_levels = {
     "federal": '//*[starts-with(@id, "select2-urovproved-result-") and "1" = substring(@id, string-length(@id))]',
@@ -165,7 +166,8 @@ def parseTable(browser, table, type='results', table_format="221", jsn=None):
         json["total_voters"] = rows_data["1"]
         json["recieved_ballots"] = rows_data["2"]
         json["issued_ballots_inside"] = json["issued_ballots_inside"] = (
-            (rows_data["4"] + (rows_data["3"] if "3" in rows_data else 0)) if before_flag is True else rows_data[
+            ((rows_data["4"] if "4" in rows_data else 0) + (
+                rows_data["3"] if "3" in rows_data else 0)) if before_flag is True else rows_data[
                 "3"]) if inside_tik is False else rows_data["3"] + rows_data["4"] + rows_data["5"]
         json["issued_ballots_outside"] = (
             rows_data["5"] if before_flag is True else rows_data["4"]) if inside_tik is False else rows_data["6"]
