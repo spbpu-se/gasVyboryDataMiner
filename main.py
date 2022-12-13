@@ -17,7 +17,7 @@ from urllib.parse import urlparse, parse_qs
 import re
 import sys
 
-DEBUG = False
+DEBUG = True
 pytesseract.pytesseract.tesseract_cmd = "D:\\Tesseract\\tesseract.exe"
 
 election_levels = {
@@ -172,7 +172,7 @@ def parseTable(browser, table, type='results', table_format="221", jsn=None):
         json["ballots_from_inside_boxes"] = rows_data[[_ for _ in rows_data if "в стационарных ящиках" in _][0]]
         json["invalid_ballots"] = rows_data[[_ for _ in rows_data if "недействительных" in _][0]]
         json["lost_ballots"] = rows_data[[_ for _ in rows_data if "утраченных" in _][0]]
-        json["not_counted_recieved_ballots"] = rows_data[[_ for _ in rows_data if "не учтенных" in _][0]]
+        json["not_counted_recieved_ballots"] = rows_data[[_ for _ in rows_data if "не учтенных" in _ or "неучтенных" in _][0]]
         json["candidates_results"] = rows_data["cand"]
         if json["uik_id"] == json["oik_id"]:
             json["uik_id"] = 0
