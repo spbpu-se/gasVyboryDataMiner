@@ -15,6 +15,7 @@ import jsons
 import json
 from urllib.parse import urlparse, parse_qs
 import re
+import sys
 
 DEBUG = False
 pytesseract.pytesseract.tesseract_cmd = "D:\\Tesseract\\tesseract.exe"
@@ -35,7 +36,8 @@ def goThroughUiks(browser, uik, json_candidates):
             if table.text == "":
                 return
             current_json_results = parseTable(browser, table, 'results')
-            if os.path.exists(str("output/") + str(current_json_results["vrn"]) + str("_") + str(current_json_results["oik_id"]) + "_" + str(current_json_results["uik_id"]) + str(".json")):
+            if os.path.exists(str("output/") + str(current_json_results["vrn"]) + str("_") + str(
+                    current_json_results["oik_id"]) + "_" + str(current_json_results["uik_id"]) + str(".json")):
                 return
             raw_candidates = current_json_results["candidates_results"][:]
             for i, cand in enumerate(raw_candidates):
@@ -43,7 +45,8 @@ def goThroughUiks(browser, uik, json_candidates):
                     if cand[0] == p_name:
                         current_json_results["candidates_results"][i] = {'candidate_id': p_id, 'result': int(cand[1])}
                         break
-            json_name = str(current_json_results["vrn"]) + str("_") + str(current_json_results["oik_id"]) + "_" + str(current_json_results["uik_id"])
+            json_name = str(current_json_results["vrn"]) + str("_") + str(current_json_results["oik_id"]) + "_" + str(
+                current_json_results["uik_id"])
             saveJson(current_json_results, json_name)
 
             for candidate in json_candidates:
@@ -250,7 +253,7 @@ def parseCandidates(browser):
     return current_json_candidates
 
 
-def observeData(browser):
+def observeData(browser, dates):
     for level in election_levels:
         solveCaptcha(browser)
         data_filter = browser.find_element(by=By.CSS_SELECTOR, value="span.filter")
@@ -259,10 +262,10 @@ def observeData(browser):
         start_date = browser.find_element(by=By.ID, value="start_date")
         browser.implicitly_wait(1)
         start_date.clear()
-        start_date.send_keys("01.01.2022")
+        start_date.send_keys(dates[0])
         end_date = browser.find_element(by=By.ID, value="end_date")
         end_date.clear()
-        end_date.send_keys("01.02.2022")
+        end_date.send_keys(dates[1])
         WebDriverWait(browser, 2).until(EC.presence_of_element_located(
             (By.XPATH, '//*[@id="search_form"]/div/div[2]/div[1]/span/span[1]/span/span/textarea')))
         browser.find_element(by=By.XPATH,
@@ -328,11 +331,12 @@ def observeData(browser):
 
 
 if __name__ == '__main__':
+    dates = sys.argv[1:]
     option = Options()
     option.add_argument("--disable-infobars")
     option.add_argument("--disable-blink-features=AutomationControlled")
     option.headless = not DEBUG
     browser = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=option)
     browser.get('http://www.vybory.izbirkom.ru/region/izbirkom')
-    observeData(browser)
+    observeData(browser, dates)
     browser.close()
