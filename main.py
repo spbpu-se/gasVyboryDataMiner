@@ -143,6 +143,12 @@ def parseTable(browser, table, type='results', table_format="221", jsn=None):
         if "3" not in rows_data:
             rows_data["3"] = 0
 
+        before_flag = False
+        inside_tik = False
+        if "досрочно" in raw_rows_data[2][1]:
+            before_flag = True
+        if "досрочно в помещении территориальной избирательной комиссии" in raw_rows_data[3][1]:
+            inside_tik = True
         tens = [key for key in rows_data.keys() if key.startswith('11')]
 
         json = jsons.JsonVrnOik
@@ -159,15 +165,28 @@ def parseTable(browser, table, type='results', table_format="221", jsn=None):
                                  if browser.find_element(By.XPATH,
                                                          value='//*[@id="report-body col"]/div[10]/div/table[2]/tbody/tr/td[2]/b') else 0))
         json["total_voters"] = rows_data["1"]
-        json["received_ballots"] = rows_data["2"]
-        json["issued_ballots_inside"] = rows_data["4"] + (rows_data["3"] if "3" in rows_data else 0)
-        json["issued_ballots_outside"] = rows_data["5"]
-        json["not_used_ballots"] = rows_data["6"]
-        json["ballots_from_outside_boxes"] = rows_data["7"]
-        json["ballots_from_inside_boxes"] = rows_data["8"]
-        json["invalid_ballots"] = rows_data["9"]
-        json["lost_ballots"] = rows_data["11"] if "11" in rows_data else rows_data[tens[1]]
-        json["not_counted_received_ballots"] = rows_data["12"] if "12" in rows_data else rows_data[tens[2]]
+        json["recieved_ballots"] = rows_data["2"]
+        json["issued_ballots_inside"] = json["issued_ballots_inside"] = (
+            (rows_data["4"] + (rows_data["3"] if "3" in rows_data else 0)) if before_flag is True else rows_data[
+                "3"]) if inside_tik is False else rows_data["3"] + rows_data["4"] + rows_data["5"]
+        json["issued_ballots_outside"] = (
+            rows_data["5"] if before_flag is True else rows_data["4"]) if inside_tik is False else rows_data["6"]
+        json["not_used_ballots"] = (
+            rows_data["6"] if before_flag is True else rows_data["5"]) if inside_tik is False else rows_data["7"]
+        json["ballots_from_outside_boxes"] = (
+            rows_data["7"] if before_flag is True else rows_data["6"]) if inside_tik is False else rows_data["8"]
+        json["ballots_from_inside_boxes"] = (
+            rows_data["8"] if before_flag is True else rows_data["7"]) if inside_tik is False else rows_data["9"]
+        json["invalid_ballots"] = (
+            rows_data["9"] if before_flag is True else rows_data["8"]) if inside_tik is False else rows_data["10"]
+        json["lost_ballots"] = ((
+                                    rows_data["11"] if "11" in rows_data else rows_data[
+                                        tens[1]]) if before_flag is True else rows_data[
+            "10"]) if inside_tik is False else rows_data["12"]
+        json["not_counted_recieved_ballots"] = ((
+                                                    rows_data["12"] if "12" in rows_data else rows_data[
+                                                        tens[2]]) if before_flag is True else rows_data[
+            "11"]) if inside_tik is False else rows_data["13"]
         json["candidates_results"] = rows_data["cand"]
         return json
     if type == 'candidates':
@@ -266,6 +285,7 @@ def observeData(browser):
         for link in linkArr:
             # Кандидаты
             browser.get(link)
+            print(link)
             WebDriverWait(browser, 1).until(EC.presence_of_element_located((By.ID, "standard-reports-name")))
             browser.find_element(by=By.ID, value="standard-reports-name").click()
             solveCaptcha(browser)
