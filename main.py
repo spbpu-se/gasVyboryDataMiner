@@ -166,15 +166,20 @@ def parseTable(browser, table, type='results', table_format="221", jsn=None):
         json["total_voters"] = rows_data[[_ for _ in rows_data if "избирателей" in _][0]]
         json["recieved_ballots"] = rows_data[[_ for _ in rows_data if "полученных" in _][0]]
         before_counter = [rows_data[a] for a in [_ for _ in rows_data if "досрочно" in _]]
-        json["issued_ballots_inside"] = rows_data[[_ for _ in rows_data if "в помещении" in _ or "в УИК" in _ or "на избирательном участке" in _ or "на участке" in _ or "в помещениях" in _][0]] + sum(
+        json["issued_ballots_inside"] = rows_data[[_ for _ in rows_data if
+                                                   "в помещении" in _ or "в УИК" in _ or "на избирательном участке" in _ or "на участке" in _ or "в помещениях" in _][
+            0]] + sum(
             int(cnt) for cnt in before_counter)
-        json["issued_ballots_outside"] = rows_data[[_ for _ in rows_data if "вне помещения" in _ or "вне УИК" in _ or "вне участка" in _ or "вне помещений" in _][0]]
+        json["issued_ballots_outside"] = rows_data[[_ for _ in rows_data if
+                                                    "вне помещения" in _ or "вне УИК" in _ or "вне участка" in _ or "вне помещений" in _][
+            0]]
         json["not_used_ballots"] = rows_data[[_ for _ in rows_data if "погашенных" in _][0]]
         json["ballots_from_outside_boxes"] = rows_data[[_ for _ in rows_data if "в переносных ящиках" in _][0]]
         json["ballots_from_inside_boxes"] = rows_data[[_ for _ in rows_data if "в стационарных ящиках" in _][0]]
         json["invalid_ballots"] = rows_data[[_ for _ in rows_data if "недействительных" in _][0]]
         json["lost_ballots"] = rows_data[[_ for _ in rows_data if "утраченных" in _][0]]
-        json["not_counted_recieved_ballots"] = rows_data[[_ for _ in rows_data if "не учтенных" in _ or "неучтенных" in _][0]]
+        json["not_counted_recieved_ballots"] = rows_data[
+            [_ for _ in rows_data if "не учтенных" in _ or "неучтенных" in _][0]]
         json["candidates_results"] = rows_data["cand"]
         if json["uik_id"] == json["oik_id"]:
             json["uik_id"] = 0
@@ -218,30 +223,61 @@ def parseTableByXPATH(browser, xpath, type='results', table_format="221", jsn=No
 
 
 def parseCandidates(browser):
-    tables = ['//*[@id="candidates-221-2"]/tbody', '//*[@id="candidates-220-2"]/tbody']
-    table = browser.find_elements(by=By.XPATH, value='//*[@id="candidates-221-2"]/tbody/tr/td/a')
-    if len(table) <= 0:
-        table = browser.find_elements(by=By.XPATH, value='//*[@id="candidates-221-2"]/tbody/tr/td/nobr/a')
-    table2 = browser.find_elements(by=By.XPATH, value='//*[@id="candidates-220-2"]/tbody/tr/td/a')
-    if len(table2) <= 0:
-        table2 = browser.find_elements(by=By.XPATH, value='//*[@id="candidates-220-2"]/tbody/tr/td/nobr/a')
-    bln = len(browser.find_elements(by=By.XPATH, value=tables[0])) > 0
-    if len(table) <= 0 and len(table2) <= 0:
-        return "continue"
-    current_json_candidates = parseTableByXPATH(browser, tables[0] if bln else tables[1],
-                                                type="candidates", table_format=("221" if bln else "220"))
-    actual_table = table if len(table) > 0 else table2
-    actual_table = actual_table
     tableArr = []
-    for _ in actual_table:
-        tableArr.append(_.get_attribute('href'))
-    for i in range(len(tableArr)):
-        browser.get(tableArr[i])
+    listsArr = []
+    current_json_candidates = []
+    if len(browser.find_elements(by=By.XPATH, value='//*[@id="report-body col"]/div[10]/div/div[5]/ul[1]/li/a')) > 0:
+        for _ in browser.find_elements(by=By.XPATH, value='//*[@id="report-body col"]/div[10]/div/div[5]/ul[1]/li/a'):
+            listsArr.append(_.get_attribute('href'))
+        for _ in listsArr:
+            browser.get(_)
+            tables = ['//*[@id="candidates-221-2"]/tbody', '//*[@id="candidates-220-2"]/tbody']
+            table = browser.find_elements(by=By.XPATH, value='//*[@id="candidates-221-2"]/tbody/tr/td/a')
+            if len(table) <= 0:
+                table = browser.find_elements(by=By.XPATH, value='//*[@id="candidates-221-2"]/tbody/tr/td/nobr/a')
+            table2 = browser.find_elements(by=By.XPATH, value='//*[@id="candidates-220-2"]/tbody/tr/td/a')
+            if len(table2) <= 0:
+                table2 = browser.find_elements(by=By.XPATH, value='//*[@id="candidates-220-2"]/tbody/tr/td/nobr/a')
+            bln = len(browser.find_elements(by=By.XPATH, value=tables[0])) > 0
+            if len(table) <= 0 and len(table2) <= 0:
+                return "continue"
+            current_json_candidates.append(parseTableByXPATH(browser, tables[0] if bln else tables[1],
+                                                type="candidates", table_format=("221" if bln else "220")))
+            actual_table = table if len(table) > 0 else table2
+            for _ in actual_table:
+                tableArr.append(_.get_attribute('href'))
+        for i in range(len(tableArr)):
+            browser.get(tableArr[i])
+            solveCaptcha(browser)
+            parseTableByXPATH(browser, '//*[@id="report-body col"]/div[10]/div/div[2]/table', type="candidate",
+                              jsn=current_json_candidates[i])
         solveCaptcha(browser)
-        parseTableByXPATH(browser, '//*[@id="report-body col"]/div[10]/div/div[2]/table', type="candidate",
-                          jsn=current_json_candidates[i])
-    solveCaptcha(browser)
-    return current_json_candidates
+        return current_json_candidates
+    else:
+        tables = ['//*[@id="candidates-221-2"]/tbody', '//*[@id="candidates-220-2"]/tbody']
+        table = browser.find_elements(by=By.XPATH, value='//*[@id="candidates-221-2"]/tbody/tr/td/a')
+        if len(table) <= 0:
+            table = browser.find_elements(by=By.XPATH, value='//*[@id="candidates-221-2"]/tbody/tr/td/nobr/a')
+        table2 = browser.find_elements(by=By.XPATH, value='//*[@id="candidates-220-2"]/tbody/tr/td/a')
+        if len(table2) <= 0:
+            table2 = browser.find_elements(by=By.XPATH, value='//*[@id="candidates-220-2"]/tbody/tr/td/nobr/a')
+        bln = len(browser.find_elements(by=By.XPATH, value=tables[0])) > 0
+        if len(table) <= 0 and len(table2) <= 0:
+            return "continue"
+        current_json_candidates = parseTableByXPATH(browser, tables[0] if bln else tables[1],
+                                                    type="candidates", table_format=("221" if bln else "220"))
+        actual_table = table if len(table) > 0 else table2
+        actual_table = actual_table
+        tableArr = []
+        for _ in actual_table:
+            tableArr.append(_.get_attribute('href'))
+        for i in range(len(tableArr)):
+            browser.get(tableArr[i])
+            solveCaptcha(browser)
+            parseTableByXPATH(browser, '//*[@id="report-body col"]/div[10]/div/div[2]/table', type="candidate",
+                              jsn=current_json_candidates[i])
+        solveCaptcha(browser)
+        return current_json_candidates
 
 
 def observeData(browser, dates):
@@ -284,16 +320,15 @@ def observeData(browser, dates):
                 continue
             reports_name.click()
             solveCaptcha(browser)
-            if browser.find_element(by=By.LINK_TEXT, value="Сведения о кандидатах"):
+            if len(browser.find_elements(by=By.LINK_TEXT, value="Сведения о кандидатах")) == 1:
                 browser.find_element(by=By.LINK_TEXT, value="Сведения о кандидатах").click()
             else:
-                if browser.find_element(by=By.LINK_TEXT,
-                                        value="Сведения о кандидатах, выдвинутых по одномандатным (многомандатным) избирательным округам"):
+                if len(browser.find_elements(by=By.LINK_TEXT,
+                                        value="Сведения о кандидатах, выдвинутых по одномандатным (многомандатным) избирательным округам")) == 1:
                     browser.find_element(by=By.LINK_TEXT,
                                          value="Сведения о кандидатах, выдвинутых по одномандатным (многомандатным) избирательным округам").click()
 
             solveCaptcha(browser)
-
             raw_candidates = parseCandidates(browser)
             if raw_candidates == "continue":
                 continue
