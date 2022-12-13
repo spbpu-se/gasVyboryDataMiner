@@ -32,6 +32,8 @@ def goThroughUiks(browser, uik, json_candidates):
         candidates = {_['candidate_id']: _['name'] for _ in json_candidates}
         table = browser.find_element(by=By.CLASS_NAME, value='table-bordered')
         if table:
+            if table.text == "":
+                return
             current_json_results = parseTable(browser, table, 'results')
             if os.path.exists(str("output/") + str(current_json_results["vrn"]) + str("_") + str(current_json_results["uik_id"]) + str(".json")):
                 return
@@ -140,9 +142,9 @@ def parseTable(browser, table, type='results', table_format="221", jsn=None):
         if "досрочно" in raw_rows_data[2][1]:
             before_flag = True
         inside_tik = False
-        if "досрочно" in raw_rows_data[3][1]:
+        if "досрочно " in raw_rows_data[3][1]:
             inside_tik = True
-        tens = [key for key in rows_data.keys() if key.startswith('11') or key.startswith('10')]
+        tens = [key for key in rows_data.keys() if len(key) == 3]
 
         json = jsons.JsonVrnOik
         json['vrn'] = getParameterFromQuery(browser, "vrn")
@@ -175,11 +177,11 @@ def parseTable(browser, table, type='results', table_format="221", jsn=None):
             rows_data["9"] if before_flag is True else rows_data["8"]) if inside_tik is False else rows_data["10"]
         json["lost_ballots"] = ((
                                     rows_data["11"] if "11" in rows_data else rows_data[
-                                        tens[1]]) if before_flag is True else rows_data[
+                                        tens[0]]) if before_flag is True else rows_data[
             "10"]) if inside_tik is False else rows_data["12"]
         json["not_counted_recieved_ballots"] = ((
                                                     rows_data["12"] if "12" in rows_data else rows_data[
-                                                        tens[2]]) if before_flag is True else rows_data[
+                                                        tens[1]]) if before_flag is True else rows_data[
             "11"]) if inside_tik is False else rows_data["13"]
         json["candidates_results"] = rows_data["cand"]
         return json
@@ -299,6 +301,7 @@ def observeData(browser):
             browser.get(link)
             solveCaptcha(browser)
             date_of_vote = browser.find_element(by=By.XPATH, value='//*[@id="election-info"]/div/div[3]/div[2]/b').text
+            WebDriverWait(browser, 5).until(EC.presence_of_element_located((By.LINK_TEXT, "Результаты выборов")))
             browser.find_element(by=By.LINK_TEXT, value="Результаты выборов").click()
             solveCaptcha(browser)
             resBtn = browser.find_element(by=By.XPATH, value='//*[@id="election-results"]/table/tbody/tr/td/a')
