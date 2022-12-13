@@ -143,12 +143,12 @@ def parseTable(browser, table, type='results', table_format="221", jsn=None):
             rows_data["3"] = 0
 
         before_flag = False
-        inside_tik = False
         if "досрочно" in raw_rows_data[2][1]:
             before_flag = True
-        if "досрочно в помещении территориальной избирательной комиссии" in raw_rows_data[3][1]:
+        inside_tik = False
+        if "досрочно" in raw_rows_data[3][1]:
             inside_tik = True
-        tens = [key for key in rows_data.keys() if key.startswith('11')]
+        tens = [key for key in rows_data.keys() if key.startswith('11') or key.startswith('10')]
 
         json = jsons.JsonVrnOik
         json['vrn'] = getParameterFromQuery(browser, "vrn")
