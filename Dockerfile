@@ -9,6 +9,6 @@ ENV end_date=$end_date
 ENV level=$level
 
 COPY . .
-RUN pip install -r ./requirements.txt && apk -i add tesseract-ocr
+RUN  apk -i add tesseract-ocr && apk -i add chromium && pip install -r ./requirements.txt
 
 ENTRYPOINT ["python", "main.py"]
