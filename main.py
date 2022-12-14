@@ -88,7 +88,7 @@ def solveCaptcha(browser):
             check = browser.find_elements(by=By.ID, value="captchaImg")
             if len(check) == 0:
                 break
-            sleep(1)
+            WebDriverWait(browser, 3).until(EC.presence_of_element_located((By.ID, "captchaImg")))
             for _ in check:
                 _.screenshot('captcha.png')
             captch = str(pytesseract.image_to_string(Image.open('captcha.png'), config="outputbase digits"))
