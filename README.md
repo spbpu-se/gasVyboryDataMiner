@@ -3,7 +3,7 @@
 # Сборка контейнера 
 
 ```bash
-    docker build --pull -t "$CI_REGISTRY_IMAGE:latest" . --build-arg start_date="dd.mm.yyyy" --build-arg end_date="dd.mm.yyyy" --build-arg level="local / regional / regcap / federal" --build-arg kafka_ip="0.0.0.0" --build-arg kafka_port="9092"
+    docker build -t "extractor:latest" . --build-arg start_date="dd.mm.yyyy" --build-arg end_date="dd.mm.yyyy" --build-arg level="local / regional / regcap / federal" --build-arg kafka_ip="0.0.0.0" --build-arg kafka_port="9092"
     
 ```
 
