@@ -13,6 +13,6 @@ ENV kafka_ip=$kafka_ip
 ENV kafka_port=$kafka_port
 
 COPY . .
-RUN  apk -i add tesseract-ocr && apk -i add chromium && pip install -r ./requirements.txt
+RUN  apk add tesseract-ocr && apk add chromium && pip install -r ./requirements.txt
 
 ENTRYPOINT ["python", "main.py"]
