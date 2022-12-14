@@ -23,15 +23,15 @@ if platform == "win32":
     pytesseract.pytesseract.tesseract_cmd = "D:\\Tesseract\\tesseract.exe"
 
 election_levels = {
-    "federal": '//*[starts-with(@id, "select2-urovproved-result-") and "1" = substring(@id, string-length(@id))]',
-    "regional": '//*[starts-with(@id, "select2-urovproved-result-") and "2" = substring(@id, string-length(@id))]',
-    "regional_capital": '//*[starts-with(@id, "select2-urovproved-result-") and "3" = substring(@id, string-length(@id))]',
+    #"federal": '//*[starts-with(@id, "select2-urovproved-result-") and "1" = substring(@id, string-length(@id))]',
+    #"regional": '//*[starts-with(@id, "select2-urovproved-result-") and "2" = substring(@id, string-length(@id))]',
+    #"regional_capital": '//*[starts-with(@id, "select2-urovproved-result-") and "3" = substring(@id, string-length(@id))]',
     "local": '//*[starts-with(@id, "select2-urovproved-result-") and "4" = substring(@id, string-length(@id))]'
 }
 
 
 def goThroughUiks(browser, uik, json_candidates):
-    if len(browser.find_elements(by=By.XPATH, value=uik + '/ul/li')) == 0:
+    if len(browser.find_elements(by=By.XPATH, value=uik + '/ul/li/a')) == 0:
         candidates = {_['candidate_id']: _['name'] for _ in json_candidates}
         table = browser.find_element(by=By.CLASS_NAME, value='table-bordered')
         if table:
@@ -164,7 +164,7 @@ def parseTable(browser, table, type='results', table_format="221", jsn=None):
                                  if browser.find_element(By.XPATH,
                                                          value='//*[@id="report-body col"]/div[10]/div/table[2]/tbody/tr/td[2]/b') else 0))
         json["total_voters"] = rows_data[[_ for _ in rows_data if "избирателей" in _][0]]
-        json["recieved_ballots"] = rows_data[[_ for _ in rows_data if "полученных" in _][0]]
+        json["recieved_ballots"] = rows_data[[_ for _ in rows_data if "полученных" in _ or "полученнных" in _][0]]
         before_counter = [rows_data[a] for a in [_ for _ in rows_data if "досрочно" in _]]
         json["issued_ballots_inside"] = rows_data[[_ for _ in rows_data if
                                                    "в помещении" in _ or "в УИК" in _ or "на избирательном участке" in _ or "на участке" in _ or "в помещениях" in _][
@@ -177,9 +177,9 @@ def parseTable(browser, table, type='results', table_format="221", jsn=None):
         json["ballots_from_outside_boxes"] = rows_data[[_ for _ in rows_data if "в переносных ящиках" in _][0]]
         json["ballots_from_inside_boxes"] = rows_data[[_ for _ in rows_data if "в стационарных ящиках" in _][0]]
         json["invalid_ballots"] = rows_data[[_ for _ in rows_data if "недействительных" in _][0]]
-        json["lost_ballots"] = rows_data[[_ for _ in rows_data if "утраченных" in _][0]]
+        json["lost_ballots"] = rows_data[[_ for _ in rows_data if "утраченных" in _ or "утерянных" in _][0]]
         json["not_counted_recieved_ballots"] = rows_data[
-            [_ for _ in rows_data if "не учтенных" in _ or "неучтенных" in _][0]]
+            [_ for _ in rows_data if "не учтенных" in _ or "неучтенных" in _ or "не учтённых" in _ or "неучтённых" in _][0]]
         json["candidates_results"] = rows_data["cand"]
         if json["uik_id"] == json["oik_id"]:
             json["uik_id"] = 0
@@ -241,8 +241,9 @@ def parseCandidates(browser):
             bln = len(browser.find_elements(by=By.XPATH, value=tables[0])) > 0
             if len(table) <= 0 and len(table2) <= 0:
                 return "continue"
-            current_json_candidates.append(parseTableByXPATH(browser, tables[0] if bln else tables[1],
-                                                type="candidates", table_format=("221" if bln else "220")))
+            temp = parseTableByXPATH(browser, tables[0] if bln else tables[1],
+                                                type="candidates", table_format=("221" if bln else "220"))
+            current_json_candidates.extend(temp)
             actual_table = table if len(table) > 0 else table2
             for _ in actual_table:
                 tableArr.append(_.get_attribute('href'))
@@ -251,7 +252,7 @@ def parseCandidates(browser):
             solveCaptcha(browser)
             parseTableByXPATH(browser, '//*[@id="report-body col"]/div[10]/div/div[2]/table', type="candidate",
                               jsn=current_json_candidates[i])
-        solveCaptcha(browser)
+            solveCaptcha(browser)
         return current_json_candidates
     else:
         tables = ['//*[@id="candidates-221-2"]/tbody', '//*[@id="candidates-220-2"]/tbody']
