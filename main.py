@@ -5,7 +5,6 @@ from selenium.common.exceptions import NoSuchElementException, StaleElementRefer
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
-from time import sleep
 import pytesseract
 from PIL import Image
 from selenium.webdriver.support.ui import WebDriverWait
@@ -17,17 +16,21 @@ from urllib.parse import urlparse, parse_qs
 import re
 import sys
 from sys import platform
+from bson import json_util
+from kafka import KafkaProducer
 
 DEBUG = False
 if platform == "win32":
     pytesseract.pytesseract.tesseract_cmd = "D:\\Tesseract\\tesseract.exe"
 
 election_levels = {
-    #"federal": '//*[starts-with(@id, "select2-urovproved-result-") and "1" = substring(@id, string-length(@id))]',
-    #"regional": '//*[starts-with(@id, "select2-urovproved-result-") and "2" = substring(@id, string-length(@id))]',
-    #"regional_capital": '//*[starts-with(@id, "select2-urovproved-result-") and "3" = substring(@id, string-length(@id))]',
+    # "federal": '//*[starts-with(@id, "select2-urovproved-result-") and "1" = substring(@id, string-length(@id))]',
+    # "regional": '//*[starts-with(@id, "select2-urovproved-result-") and "2" = substring(@id, string-length(@id))]',
+    # "regional_capital": '//*[starts-with(@id, "select2-urovproved-result-") and "3" = substring(@id, string-length(@id))]',
     "local": '//*[starts-with(@id, "select2-urovproved-result-") and "4" = substring(@id, string-length(@id))]'
 }
+
+producer = KafkaProducer(bootstrap_servers='localhost:9092')
 
 
 def goThroughUiks(browser, uik, json_candidates):
@@ -38,22 +41,17 @@ def goThroughUiks(browser, uik, json_candidates):
             if table.text == "":
                 return
             current_json_results = parseTable(browser, table, 'results')
-            if os.path.exists(str("output/") + str(current_json_results["vrn"]) + str("_") + str(
-                    current_json_results["oik_id"]) + "_" + str(current_json_results["uik_id"]) + str(".json")):
-                return
             raw_candidates = current_json_results["candidates_results"][:]
             for i, cand in enumerate(raw_candidates):
                 for p_id, p_name in candidates.items():
                     if cand[0] == p_name:
                         current_json_results["candidates_results"][i] = {'candidate_id': p_id, 'result': int(cand[1])}
                         break
-            json_name = str(current_json_results["vrn"]) + str("_") + str(current_json_results["oik_id"]) + "_" + str(
-                current_json_results["uik_id"])
-            saveJson(current_json_results, json_name)
+            saveJson(current_json_results, "vrn_oik_uik")
 
             for candidate in json_candidates:
                 candidate['oik_id'] = getOik(browser)
-                saveJson(candidate, str(candidate["vrn"]) + str("_") + str(candidate["candidate_id"]))
+                saveJson(candidate, "vrn_candidate")
 
     else:
         browser.find_elements(by=By.XPATH, value=uik)[0].click()
@@ -107,8 +105,7 @@ def flatTo2DList(list, rowSize):
 
 
 def saveJson(jsn, fn):
-    with open("output/" + fn + ".json", "w", encoding='utf8') as f:
-        json.dump(jsn, f, ensure_ascii=False)
+    producer.send(fn, json.dumps(jsn, default=json_util.default).encode('utf-8'))
 
 
 def parseTable(browser, table, type='results', table_format="221", jsn=None):
@@ -179,12 +176,13 @@ def parseTable(browser, table, type='results', table_format="221", jsn=None):
         json["invalid_ballots"] = rows_data[[_ for _ in rows_data if "недействительных" in _][0]]
         json["lost_ballots"] = rows_data[[_ for _ in rows_data if "утраченных" in _ or "утерянных" in _][0]]
         json["not_counted_recieved_ballots"] = rows_data[
-            [_ for _ in rows_data if "не учтенных" in _ or "неучтенных" in _ or "не учтённых" in _ or "неучтённых" in _][0]]
+            [_ for _ in rows_data if
+             "не учтенных" in _ or "неучтенных" in _ or "не учтённых" in _ or "неучтённых" in _][0]]
         json["candidates_results"] = rows_data["cand"]
         if json["uik_id"] == json["oik_id"]:
             json["uik_id"] = 0
         json_oik["uik_id"] = json["uik_id"]
-        saveJson(json_oik, '_'.join(map(str, (json_oik['vrn'], json_oik['oik_id']))))
+        saveJson(json_oik, "vrn_oik")
         return json
     if type == 'candidates':
         raw_rows_data = flatTo2DList(raw_data, (8 if table_format == "220" else 7))
@@ -242,7 +240,7 @@ def parseCandidates(browser):
             if len(table) <= 0 and len(table2) <= 0:
                 return "continue"
             temp = parseTableByXPATH(browser, tables[0] if bln else tables[1],
-                                                type="candidates", table_format=("221" if bln else "220"))
+                                     type="candidates", table_format=("221" if bln else "220"))
             current_json_candidates.extend(temp)
             actual_table = table if len(table) > 0 else table2
             for _ in actual_table:
@@ -311,11 +309,20 @@ def observeData(browser, dates):
         # linkArr = ['http://www.vologod.vybory.izbirkom.ru/region/izbirkom?action=show&root_a=1&vrn=4354028286341&region=35&global=&type=0&prver=0&pronetvd=null']
         for link in linkArr:
             # Кандидаты
-            if os.path.exists(str("output/") + str(link.split('vrn=')[1].split('&')[0]) + str(".json")):
-                continue
+            # if os.path.exists(str("output/") + str(link.split('vrn=')[1].split('&')[0]) + str(".json")):
+            #     continue
             browser.get(link)
             solveCaptcha(browser)
             print(link)
+            date_of_vote = browser.find_element(by=By.XPATH, value='//*[@id="election-info"]/div/div[3]/div[2]/b').text
+            current_json_vrn = jsons.JsonVrn
+            current_json_vrn["vrn"] = getParameterFromQuery(browser, "vrn")
+            current_json_vrn["title"] = str(
+                browser.find_element(by=By.XPATH, value='//*[@id="election-title"]').text.split('\n')[0])
+            current_json_vrn["level"] = level
+            current_json_vrn["date"] = date_of_vote
+            saveJson(current_json_vrn, "vrn")
+
             reports_name = browser.find_element(by=By.ID, value="standard-reports-name")
             if reports_name.is_displayed() is False:
                 continue
@@ -325,7 +332,7 @@ def observeData(browser, dates):
                 browser.find_element(by=By.LINK_TEXT, value="Сведения о кандидатах").click()
             else:
                 if len(browser.find_elements(by=By.LINK_TEXT,
-                                        value="Сведения о кандидатах, выдвинутых по одномандатным (многомандатным) избирательным округам")) == 1:
+                                             value="Сведения о кандидатах, выдвинутых по одномандатным (многомандатным) избирательным округам")) == 1:
                     browser.find_element(by=By.LINK_TEXT,
                                          value="Сведения о кандидатах, выдвинутых по одномандатным (многомандатным) избирательным округам").click()
 
@@ -336,7 +343,6 @@ def observeData(browser, dates):
             # УИКи
             browser.get(link)
             solveCaptcha(browser)
-            date_of_vote = browser.find_element(by=By.XPATH, value='//*[@id="election-info"]/div/div[3]/div[2]/b').text
             WebDriverWait(browser, 5).until(EC.presence_of_element_located((By.LINK_TEXT, "Результаты выборов")))
             browser.find_element(by=By.LINK_TEXT, value="Результаты выборов").click()
             solveCaptcha(browser)
@@ -348,15 +354,6 @@ def observeData(browser, dates):
             else:
                 resBtn.click()
                 solveCaptcha(browser)
-
-            current_json_vrn = jsons.JsonVrn
-            current_json_vrn["vrn"] = getParameterFromQuery(browser, "vrn")
-            current_json_vrn["title"] = str(
-                browser.find_element(by=By.XPATH, value='//*[@id="election-title"]').text.split('\n')[0])
-            current_json_vrn["level"] = level
-            current_json_vrn["date"] = date_of_vote
-
-            saveJson(current_json_vrn, str(current_json_vrn["vrn"]))
             goThroughUiks(browser, '/html/body/div[2]/main/div[2]/div[2]/div[1]/ul/li', raw_candidates)
         browser.get('http://www.vybory.izbirkom.ru/region/izbirkom')
 
