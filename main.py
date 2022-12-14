@@ -31,7 +31,7 @@ election_levels = {
 }
 
 server = str(envir['kafka_ip']) + str(":") + str(envir['kafka_port'])
-producer = KafkaProducer(bootstrap_servers='localhost:9092')
+producer = KafkaProducer(bootstrap_servers=server)
 
 
 def goThroughUiks(browser, uik, json_candidates):
