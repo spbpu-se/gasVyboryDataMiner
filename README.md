@@ -5,7 +5,7 @@
 ```bash
     docker build -t "extractor:latest" . --build-arg start_date="dd.mm.yyyy" --build-arg end_date="dd.mm.yyyy" --build-arg level="local / regional / regcap / federal" --build-arg kafka_ip="0.0.0.0" --build-arg kafka_port="9092"
     
-    docker run -e start_date="dd.mm.yyyy" -e end_date="dd.mm.yyyy" -e level="local / regional / regcap / federal" -e kafka_ip="0.0.0.0" -e --kafka_port="9092" extractor:latest
+    docker run -e start_date="dd.mm.yyyy" -e end_date="dd.mm.yyyy" -e level="local / regional / regcap / federal" -e kafka_ip="0.0.0.0" -e kafka_port="9092" extractor:latest
     
 ```
 
