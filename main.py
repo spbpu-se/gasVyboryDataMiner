@@ -14,22 +14,23 @@ import jsons
 import json
 from urllib.parse import urlparse, parse_qs
 import re
-import sys
 from sys import platform
 from bson import json_util
 from kafka import KafkaProducer
 
+envir = os.environ
 DEBUG = False
 if platform == "win32":
     pytesseract.pytesseract.tesseract_cmd = "D:\\Tesseract\\tesseract.exe"
 
 election_levels = {
-    # "federal": '//*[starts-with(@id, "select2-urovproved-result-") and "1" = substring(@id, string-length(@id))]',
-    # "regional": '//*[starts-with(@id, "select2-urovproved-result-") and "2" = substring(@id, string-length(@id))]',
-    # "regional_capital": '//*[starts-with(@id, "select2-urovproved-result-") and "3" = substring(@id, string-length(@id))]',
+    "federal": '//*[starts-with(@id, "select2-urovproved-result-") and "1" = substring(@id, string-length(@id))]',
+    "regional": '//*[starts-with(@id, "select2-urovproved-result-") and "2" = substring(@id, string-length(@id))]',
+    "regional_capital": '//*[starts-with(@id, "select2-urovproved-result-") and "3" = substring(@id, string-length(@id))]',
     "local": '//*[starts-with(@id, "select2-urovproved-result-") and "4" = substring(@id, string-length(@id))]'
 }
 
+server = str(envir['kafka_ip']) + str(":") + str(envir['kafka_port'])
 producer = KafkaProducer(bootstrap_servers='localhost:9092')
 
 
@@ -279,87 +280,85 @@ def parseCandidates(browser):
         return current_json_candidates
 
 
-def observeData(browser, dates):
-    for level in election_levels:
+def observeData(browser):
+    solveCaptcha(browser)
+    data_filter = browser.find_element(by=By.CSS_SELECTOR, value="span.filter")
+    data_filter.click()
+    WebDriverWait(browser, 1).until(EC.presence_of_element_located((By.ID, "start_date")))
+    start_date = browser.find_element(by=By.ID, value="start_date")
+    browser.implicitly_wait(1)
+    start_date.clear()
+    start_date.send_keys(envir["start_date"])
+    end_date = browser.find_element(by=By.ID, value="end_date")
+    end_date.clear()
+    end_date.send_keys(envir["end_date"])
+    WebDriverWait(browser, 2).until(EC.presence_of_element_located(
+        (By.XPATH, '//*[@id="search_form"]/div/div[2]/div[1]/span/span[1]/span/span/textarea')))
+    browser.find_element(by=By.XPATH,
+                         value='//*[@id="search_form"]/div/div[2]/div[1]/span/span[1]/span/span/textarea').click()
+    browser.find_element(by=By.XPATH, value=election_levels[envir["level"]]).click()
+    browser.find_element(by=By.XPATH, value='//*[@id="urovproved-close-drpdown-btn"]').click()
+    browser.find_element(by=By.XPATH, value='//*[@id="calendar-btn-search"]').click()
+    solveCaptcha(browser)
+    links = browser.find_elements(by=By.XPATH, value="//a[@href]")
+    links = links[26:]
+    linkArr = []
+    for link in links:
+        linkArr.append(link.get_attribute('href'))
+    print("all %i links are stacked!" % (len(linkArr)))
+    # linkArr = ['http://www.vologod.vybory.izbirkom.ru/region/izbirkom?action=show&root_a=1&vrn=4354028286341&region=35&global=&type=0&prver=0&pronetvd=null']
+    for link in linkArr:
+        # Кандидаты
+        # if os.path.exists(str("output/") + str(link.split('vrn=')[1].split('&')[0]) + str(".json")):
+        #     continue
+        browser.get(link)
         solveCaptcha(browser)
-        data_filter = browser.find_element(by=By.CSS_SELECTOR, value="span.filter")
-        data_filter.click()
-        WebDriverWait(browser, 1).until(EC.presence_of_element_located((By.ID, "start_date")))
-        start_date = browser.find_element(by=By.ID, value="start_date")
-        browser.implicitly_wait(1)
-        start_date.clear()
-        start_date.send_keys(dates[0])
-        end_date = browser.find_element(by=By.ID, value="end_date")
-        end_date.clear()
-        end_date.send_keys(dates[1])
-        WebDriverWait(browser, 2).until(EC.presence_of_element_located(
-            (By.XPATH, '//*[@id="search_form"]/div/div[2]/div[1]/span/span[1]/span/span/textarea')))
-        browser.find_element(by=By.XPATH,
-                             value='//*[@id="search_form"]/div/div[2]/div[1]/span/span[1]/span/span/textarea').click()
-        browser.find_element(by=By.XPATH, value=election_levels[level]).click()
-        browser.find_element(by=By.XPATH, value='//*[@id="urovproved-close-drpdown-btn"]').click()
-        browser.find_element(by=By.XPATH, value='//*[@id="calendar-btn-search"]').click()
+        print(link)
+        date_of_vote = browser.find_element(by=By.XPATH, value='//*[@id="election-info"]/div/div[3]/div[2]/b').text
+        current_json_vrn = jsons.JsonVrn
+        current_json_vrn["vrn"] = getParameterFromQuery(browser, "vrn")
+        current_json_vrn["title"] = str(
+            browser.find_element(by=By.XPATH, value='//*[@id="election-title"]').text.split('\n')[0])
+        current_json_vrn["level"] = level
+        current_json_vrn["date"] = date_of_vote
+        saveJson(current_json_vrn, "vrn")
+
+        reports_name = browser.find_element(by=By.ID, value="standard-reports-name")
+        if reports_name.is_displayed() is False:
+            continue
+        reports_name.click()
         solveCaptcha(browser)
-        links = browser.find_elements(by=By.XPATH, value="//a[@href]")
-        links = links[26:]
-        linkArr = []
-        for link in links:
-            linkArr.append(link.get_attribute('href'))
-        print("all %i links are stacked!" % (len(linkArr)))
-        # linkArr = ['http://www.vologod.vybory.izbirkom.ru/region/izbirkom?action=show&root_a=1&vrn=4354028286341&region=35&global=&type=0&prver=0&pronetvd=null']
-        for link in linkArr:
-            # Кандидаты
-            # if os.path.exists(str("output/") + str(link.split('vrn=')[1].split('&')[0]) + str(".json")):
-            #     continue
-            browser.get(link)
-            solveCaptcha(browser)
-            print(link)
-            date_of_vote = browser.find_element(by=By.XPATH, value='//*[@id="election-info"]/div/div[3]/div[2]/b').text
-            current_json_vrn = jsons.JsonVrn
-            current_json_vrn["vrn"] = getParameterFromQuery(browser, "vrn")
-            current_json_vrn["title"] = str(
-                browser.find_element(by=By.XPATH, value='//*[@id="election-title"]').text.split('\n')[0])
-            current_json_vrn["level"] = level
-            current_json_vrn["date"] = date_of_vote
-            saveJson(current_json_vrn, "vrn")
+        if len(browser.find_elements(by=By.LINK_TEXT, value="Сведения о кандидатах")) == 1:
+            browser.find_element(by=By.LINK_TEXT, value="Сведения о кандидатах").click()
+        else:
+            if len(browser.find_elements(by=By.LINK_TEXT,
+                                         value="Сведения о кандидатах, выдвинутых по одномандатным (многомандатным) избирательным округам")) == 1:
+                browser.find_element(by=By.LINK_TEXT,
+                                     value="Сведения о кандидатах, выдвинутых по одномандатным (многомандатным) избирательным округам").click()
 
-            reports_name = browser.find_element(by=By.ID, value="standard-reports-name")
-            if reports_name.is_displayed() is False:
-                continue
-            reports_name.click()
+        solveCaptcha(browser)
+        raw_candidates = parseCandidates(browser)
+        if raw_candidates == "continue":
+            continue
+        # УИКи
+        browser.get(link)
+        solveCaptcha(browser)
+        WebDriverWait(browser, 5).until(EC.presence_of_element_located((By.LINK_TEXT, "Результаты выборов")))
+        browser.find_element(by=By.LINK_TEXT, value="Результаты выборов").click()
+        solveCaptcha(browser)
+        resBtn = browser.find_element(by=By.XPATH, value='//*[@id="election-results"]/table/tbody/tr/td/a')
+        if resBtn.text not in (
+                "Результаты выборов", "Результаты выборов по одномандатному (многомандатному) округу",
+                "Данные о предварительных итогах голосования по одномандатному (многомандатному) округу"):
+            continue
+        else:
+            resBtn.click()
             solveCaptcha(browser)
-            if len(browser.find_elements(by=By.LINK_TEXT, value="Сведения о кандидатах")) == 1:
-                browser.find_element(by=By.LINK_TEXT, value="Сведения о кандидатах").click()
-            else:
-                if len(browser.find_elements(by=By.LINK_TEXT,
-                                             value="Сведения о кандидатах, выдвинутых по одномандатным (многомандатным) избирательным округам")) == 1:
-                    browser.find_element(by=By.LINK_TEXT,
-                                         value="Сведения о кандидатах, выдвинутых по одномандатным (многомандатным) избирательным округам").click()
-
-            solveCaptcha(browser)
-            raw_candidates = parseCandidates(browser)
-            if raw_candidates == "continue":
-                continue
-            # УИКи
-            browser.get(link)
-            solveCaptcha(browser)
-            WebDriverWait(browser, 5).until(EC.presence_of_element_located((By.LINK_TEXT, "Результаты выборов")))
-            browser.find_element(by=By.LINK_TEXT, value="Результаты выборов").click()
-            solveCaptcha(browser)
-            resBtn = browser.find_element(by=By.XPATH, value='//*[@id="election-results"]/table/tbody/tr/td/a')
-            if resBtn.text not in (
-                    "Результаты выборов", "Результаты выборов по одномандатному (многомандатному) округу",
-                    "Данные о предварительных итогах голосования по одномандатному (многомандатному) округу"):
-                continue
-            else:
-                resBtn.click()
-                solveCaptcha(browser)
-            goThroughUiks(browser, '/html/body/div[2]/main/div[2]/div[2]/div[1]/ul/li', raw_candidates)
-        browser.get('http://www.vybory.izbirkom.ru/region/izbirkom')
+        goThroughUiks(browser, '/html/body/div[2]/main/div[2]/div[2]/div[1]/ul/li', raw_candidates)
+    browser.get('http://www.vybory.izbirkom.ru/region/izbirkom')
 
 
 if __name__ == '__main__':
-    dates = sys.argv[1:]
     option = Options()
     option.add_argument("--disable-infobars")
     option.add_argument("--disable-blink-features=AutomationControlled")
@@ -367,5 +366,5 @@ if __name__ == '__main__':
     option.headless = not DEBUG
     browser = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=option)
     browser.get('http://www.vybory.izbirkom.ru/region/izbirkom')
-    observeData(browser, dates)
+    observeData(browser)
     browser.close()
