@@ -52,10 +52,14 @@ def goThroughUiks(browser, uik, json_candidates):
                     if cand[0] == p_name:
                         current_json_results["candidates_results"][i] = {'candidate_id': p_id, 'result': int(cand[1])}
                         break
+            if db.results.find_one(current_json_results.copy()).count() > 0:
+                return
             post_id = db.results.insert_one(current_json_results.copy())
 
             for candidate in json_candidates:
                 candidate['oik_id'] = getOik(browser)
+                if db.candidates.find_one(candidate.copy()).count() > 0:
+                    return
                 rec_id = db.candidates.insert_one(candidate.copy())
 
     else:
@@ -182,6 +186,8 @@ def parseTable(browser, table, type='results', table_format="221", jsn=None):
         if json["uik_id"] == json["oik_id"]:
             json["uik_id"] = 0
         json_oik["uik_id"] = json["uik_id"]
+        if db.districts.find_one(json_oik.copy()).count() > 0:
+            return json
         post_id = db.districts.insert_one(json_oik.copy())
         return json
     if type == 'candidates':
@@ -351,6 +357,8 @@ def observeData(browser):
             browser.find_element(by=By.XPATH, value='//*[@id="election-title"]').text.split('\n')[0])
         current_json_vrn["level"] = envir["level"]
         current_json_vrn["date"] = date_of_vote
+        if db.elections.find_one(current_json_vrn.copy()).count() > 0::
+            continue
         post_id = db.elections.insert_one(current_json_vrn.copy())
         goThroughUiks(browser, '/html/body/div[2]/main/div[2]/div[2]/div[1]/ul/li', raw_candidates)
     browser.get('http://www.vybory.izbirkom.ru/region/izbirkom')
