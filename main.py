@@ -17,6 +17,7 @@ import logging
 import sys
 from sys import platform
 from pymongo import MongoClient
+from selenium.common.exceptions import TimeoutException
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
 envir = os.environ
@@ -90,7 +91,10 @@ def solveCaptcha(browser):
             if len(check) == 0:
                 break
             print("CAPTCHA!")
-            WebDriverWait(browser, 3).until(EC.presence_of_element_located((By.ID, "captchaImg")))
+            try:
+                WebDriverWait(browser, 3).until(EC.presence_of_element_located((By.ID, "captchaImg")))
+            except TimeoutException:
+                browser.refresh()
             sleep(1)
             for _ in check:
                 _.screenshot('captcha.png')
