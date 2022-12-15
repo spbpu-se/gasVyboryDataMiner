@@ -1,4 +1,4 @@
-FROM python:3.9
+FROM joyzoursky/python-chromedriver:3.9
 
 ARG start_date
 ARG end_date
