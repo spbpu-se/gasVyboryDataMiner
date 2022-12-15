@@ -13,8 +13,11 @@ from webdriver_manager.chrome import ChromeDriverManager
 import jsons
 from urllib.parse import urlparse, parse_qs
 import re
+import logging
+import sys
 from sys import platform
 from pymongo import MongoClient
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
 envir = os.environ
 DEBUG = False
@@ -86,6 +89,7 @@ def solveCaptcha(browser):
             check = browser.find_elements(by=By.ID, value="captchaImg")
             if len(check) == 0:
                 break
+            print("CAPTCHA!")
             WebDriverWait(browser, 3).until(EC.presence_of_element_located((By.ID, "captchaImg")))
             for _ in check:
                 _.screenshot('captcha.png')
