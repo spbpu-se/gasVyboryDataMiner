@@ -353,6 +353,7 @@ if __name__ == '__main__':
     option.add_argument("--disable-infobars")
     option.add_argument("--disable-blink-features=AutomationControlled")
     option.add_argument("--disable-dev-shm-usage")
+    option.add_argument("----no-sandbox")
     option.headless = not DEBUG
     browser = webdriver.Chrome(options=option)
     browser.get('http://www.vybory.izbirkom.ru/region/izbirkom')
