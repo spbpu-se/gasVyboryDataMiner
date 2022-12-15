@@ -5,7 +5,6 @@ from selenium.common.exceptions import NoSuchElementException, StaleElementRefer
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
-from time import sleep
 import pytesseract
 from PIL import Image
 from selenium.webdriver.support.ui import WebDriverWait
@@ -17,17 +16,21 @@ from urllib.parse import urlparse, parse_qs
 import re
 import sys
 from sys import platform
+from pymongo import MongoClient
 
 DEBUG = False
 if platform == "win32":
     pytesseract.pytesseract.tesseract_cmd = "D:\\Tesseract\\tesseract.exe"
 
 election_levels = {
-    #"federal": '//*[starts-with(@id, "select2-urovproved-result-") and "1" = substring(@id, string-length(@id))]',
-    #"regional": '//*[starts-with(@id, "select2-urovproved-result-") and "2" = substring(@id, string-length(@id))]',
-    #"regional_capital": '//*[starts-with(@id, "select2-urovproved-result-") and "3" = substring(@id, string-length(@id))]',
+    "federal": '//*[starts-with(@id, "select2-urovproved-result-") and "1" = substring(@id, string-length(@id))]',
+    "regional": '//*[starts-with(@id, "select2-urovproved-result-") and "2" = substring(@id, string-length(@id))]',
+    "regional_capital": '//*[starts-with(@id, "select2-urovproved-result-") and "3" = substring(@id, string-length(@id))]',
     "local": '//*[starts-with(@id, "select2-urovproved-result-") and "4" = substring(@id, string-length(@id))]'
 }
+
+client = MongoClient('localhost', 27017)
+db = client.gas_vybory
 
 
 def goThroughUiks(browser, uik, json_candidates):
@@ -38,22 +41,17 @@ def goThroughUiks(browser, uik, json_candidates):
             if table.text == "":
                 return
             current_json_results = parseTable(browser, table, 'results')
-            if os.path.exists(str("output/") + str(current_json_results["vrn"]) + str("_") + str(
-                    current_json_results["oik_id"]) + "_" + str(current_json_results["uik_id"]) + str(".json")):
-                return
             raw_candidates = current_json_results["candidates_results"][:]
             for i, cand in enumerate(raw_candidates):
                 for p_id, p_name in candidates.items():
                     if cand[0] == p_name:
                         current_json_results["candidates_results"][i] = {'candidate_id': p_id, 'result': int(cand[1])}
                         break
-            json_name = str(current_json_results["vrn"]) + str("_") + str(current_json_results["oik_id"]) + "_" + str(
-                current_json_results["uik_id"])
-            saveJson(current_json_results, json_name)
+            post_id = db.results.insert_one(current_json_results)
 
             for candidate in json_candidates:
                 candidate['oik_id'] = getOik(browser)
-                saveJson(candidate, str(candidate["vrn"]) + str("_") + str(candidate["candidate_id"]))
+                rec_id = db.candidates.insert_one(candidate)
 
     else:
         browser.find_elements(by=By.XPATH, value=uik)[0].click()
@@ -106,11 +104,6 @@ def flatTo2DList(list, rowSize):
     return [[*list[rowSize * i: rowSize * i + rowSize]] for i in range(int(len(list) / rowSize))]
 
 
-def saveJson(jsn, fn):
-    with open("output/" + fn + ".json", "w", encoding='utf8') as f:
-        json.dump(jsn, f, ensure_ascii=False)
-
-
 def parseTable(browser, table, type='results', table_format="221", jsn=None):
     raw_data = []
     rows_table = table.find_elements(by=By.TAG_NAME, value="tr")
@@ -141,14 +134,7 @@ def parseTable(browser, table, type='results', table_format="221", jsn=None):
 
         if "3" not in rows_data:
             rows_data["3"] = 0
-
-        # before_flag = False
-        # if "досрочно" in raw_rows_data[2][1]:
-        #     before_flag = True
-        # inside_tik = False
-        # if "досрочно " in raw_rows_data[3][1]:
-        #     inside_tik = True
-        tens = [key for key in rows_data.keys() if len(key) == 3]
+            
 
         json_oik = jsons.JsonVrnOik
         json_oik['vrn'] = getParameterFromQuery(browser, "vrn")
@@ -179,12 +165,13 @@ def parseTable(browser, table, type='results', table_format="221", jsn=None):
         json["invalid_ballots"] = rows_data[[_ for _ in rows_data if "недействительных" in _][0]]
         json["lost_ballots"] = rows_data[[_ for _ in rows_data if "утраченных" in _ or "утерянных" in _][0]]
         json["not_counted_recieved_ballots"] = rows_data[
-            [_ for _ in rows_data if "не учтенных" in _ or "неучтенных" in _ or "не учтённых" in _ or "неучтённых" in _][0]]
+            [_ for _ in rows_data if
+             "не учтенных" in _ or "неучтенных" in _ or "не учтённых" in _ or "неучтённых" in _][0]]
         json["candidates_results"] = rows_data["cand"]
         if json["uik_id"] == json["oik_id"]:
             json["uik_id"] = 0
         json_oik["uik_id"] = json["uik_id"]
-        saveJson(json_oik, '_'.join(map(str, (json_oik['vrn'], json_oik['oik_id']))))
+        post_id = db.districts.insert_one(json_oik)
         return json
     if type == 'candidates':
         raw_rows_data = flatTo2DList(raw_data, (8 if table_format == "220" else 7))
@@ -242,7 +229,7 @@ def parseCandidates(browser):
             if len(table) <= 0 and len(table2) <= 0:
                 return "continue"
             temp = parseTableByXPATH(browser, tables[0] if bln else tables[1],
-                                                type="candidates", table_format=("221" if bln else "220"))
+                                     type="candidates", table_format=("221" if bln else "220"))
             current_json_candidates.extend(temp)
             actual_table = table if len(table) > 0 else table2
             for _ in actual_table:
@@ -308,7 +295,6 @@ def observeData(browser, dates):
         for link in links:
             linkArr.append(link.get_attribute('href'))
         print("all %i links are stacked!" % (len(linkArr)))
-        # linkArr = ['http://www.vologod.vybory.izbirkom.ru/region/izbirkom?action=show&root_a=1&vrn=4354028286341&region=35&global=&type=0&prver=0&pronetvd=null']
         for link in linkArr:
             # Кандидаты
             if os.path.exists(str("output/") + str(link.split('vrn=')[1].split('&')[0]) + str(".json")):
@@ -325,7 +311,7 @@ def observeData(browser, dates):
                 browser.find_element(by=By.LINK_TEXT, value="Сведения о кандидатах").click()
             else:
                 if len(browser.find_elements(by=By.LINK_TEXT,
-                                        value="Сведения о кандидатах, выдвинутых по одномандатным (многомандатным) избирательным округам")) == 1:
+                                             value="Сведения о кандидатах, выдвинутых по одномандатным (многомандатным) избирательным округам")) == 1:
                     browser.find_element(by=By.LINK_TEXT,
                                          value="Сведения о кандидатах, выдвинутых по одномандатным (многомандатным) избирательным округам").click()
 
@@ -355,8 +341,7 @@ def observeData(browser, dates):
                 browser.find_element(by=By.XPATH, value='//*[@id="election-title"]').text.split('\n')[0])
             current_json_vrn["level"] = level
             current_json_vrn["date"] = date_of_vote
-
-            saveJson(current_json_vrn, str(current_json_vrn["vrn"]))
+            post_id = db.elections.insert_one(current_json_vrn)
             goThroughUiks(browser, '/html/body/div[2]/main/div[2]/div[2]/div[1]/ul/li', raw_candidates)
         browser.get('http://www.vybory.izbirkom.ru/region/izbirkom')
 
