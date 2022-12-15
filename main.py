@@ -357,7 +357,7 @@ def observeData(browser):
             browser.find_element(by=By.XPATH, value='//*[@id="election-title"]').text.split('\n')[0])
         current_json_vrn["level"] = envir["level"]
         current_json_vrn["date"] = date_of_vote
-        if db.elections.find_one(current_json_vrn.copy()).count() > 0::
+        if db.elections.find_one(current_json_vrn.copy()).count() > 0:
             continue
         post_id = db.elections.insert_one(current_json_vrn.copy())
         goThroughUiks(browser, '/html/body/div[2]/main/div[2]/div[2]/div[1]/ul/li', raw_candidates)
