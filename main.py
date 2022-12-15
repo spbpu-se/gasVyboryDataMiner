@@ -96,7 +96,7 @@ def solveCaptcha(browser):
                 WebDriverWait(browser, 3).until(EC.presence_of_element_located((By.ID, "captchaImg")))
             except TimeoutException:
                 browser.refresh()
-            sleep(1)
+            time.sleep(1)
             for _ in check:
                 _.screenshot('captcha.png')
             captch = str(pytesseract.image_to_string(Image.open('captcha.png'), config="outputbase digits"))
