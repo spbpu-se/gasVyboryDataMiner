@@ -348,9 +348,14 @@ if __name__ == '__main__':
     option = Options()
     option.add_argument("--disable-infobars")
     option.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-gpu')
+    options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('--headless')
+    options.add_argument('--start-maximized')
 
     option.headless = not DEBUG
-    browser = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=option)
+    browser = webdriver.Chrome(options=option)
     browser.get('http://www.vybory.izbirkom.ru/region/izbirkom')
     observeData(browser)
     browser.close()
