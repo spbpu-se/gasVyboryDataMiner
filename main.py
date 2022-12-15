@@ -18,6 +18,7 @@ import sys
 from sys import platform
 from pymongo import MongoClient
 from selenium.common.exceptions import TimeoutException
+import time
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
 envir = os.environ
