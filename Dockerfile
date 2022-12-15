@@ -17,6 +17,6 @@ ENV mongo_usr=$mongo_usr
 ENV mongo_pwd=$mongo_pwd
 
 COPY . .
-RUN  apt-get -y update && apt-get -y install tesseract-ocr && apt-get -y install chromium && pip install -r ./requirements.txt
+RUN  apt-get -y update && apt-get -y install tesseract-ocr && pip install -r ./requirements.txt
 
 ENTRYPOINT ["python", "main.py"]
