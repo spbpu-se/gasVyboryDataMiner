@@ -58,8 +58,8 @@ def goThroughUiks(browser, uik, json_candidates):
 
             for candidate in json_candidates:
                 candidate['oik_id'] = getOik(browser)
-                if db.candidates.find_one(candidate.copy()) is not None:
-                    return
+                if len(list(db.candidates.find({"candidate_id": candidate["candidate_id"]}))) == 1:
+                    continue
                 rec_id = db.candidates.insert_one(candidate.copy())
 
     else:
