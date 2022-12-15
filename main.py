@@ -230,6 +230,7 @@ def parseCandidates(browser):
     tableArr = []
     listsArr = []
     current_json_candidates = []
+    browser.find_element(by=By.XPATH, value="/html/body/div[2]/main/div[2]/div[2]/div[1]/ul/li/a[2]").click()
     if len(browser.find_elements(by=By.XPATH, value='//*[@id="report-body col"]/div[10]/div/div[5]/ul[1]/li/a')) > 0:
         for _ in browser.find_elements(by=By.XPATH, value='//*[@id="report-body col"]/div[10]/div/div[5]/ul[1]/li/a'):
             listsArr.append(_.get_attribute('href'))
