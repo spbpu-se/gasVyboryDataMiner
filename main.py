@@ -79,6 +79,8 @@ def getParameterFromQuery(browser, parameter):
 
 def getOik(browser):
     res = re.findall(r'\d+', browser.find_element(by=By.CLASS_NAME, value='breadcrumb').text)
+    if len(res) == 1:
+        return 0
     return int(res[0]) if res else 0
 
 
