@@ -378,7 +378,7 @@ def observeData(browser):
         current_json_vrn["title"] = str(
             browser.find_element(by=By.XPATH, value='//*[@id="election-title"]').text.split('\n')[0])
         current_json_vrn["level"] = envir["level"]
-        current_json_vrn["date"] = datetime.strptime(date_of_vote, '%d.%m.%Y').date()
+        current_json_vrn["date"] = datetime.strptime(date_of_vote, '%d.%m.%Y')
         if db.elections.find_one(current_json_vrn.copy()) is not None:
             continue
         post_id = db.elections.insert_one(current_json_vrn.copy())
