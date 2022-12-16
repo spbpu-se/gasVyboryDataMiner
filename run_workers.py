@@ -6,20 +6,24 @@ MONGO_PORT = "27017"
 MONGO_USR = "admin"
 MONGO_PWD = "admin"
 LEVEL = "local"
-MAX_CONTAINERS = 6
+MAX_CONTAINERS = 4
 
 dd = 1
 mm = 1
 yyyy = 2021
 
-init_end_dd = 1
-init_end_mm = 1
-init_end_yyyy = 2022
+init_end_date = "01.01.2022"
 
 client = docker.from_env()
 container_num = 0
 
-while not (dd < init_end_dd and mm != init_end_mm and yyyy < init_end_yyyy):
+start_date = ""
+end_date = ""
+
+while True:
+    if init_end_date == end_date:
+      break
+
     if len(client.containers.list()) < MAX_CONTAINERS:
         while len(client.containers.list()) < MAX_CONTAINERS:
             start_dd = str(dd)
