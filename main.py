@@ -19,6 +19,7 @@ from sys import platform
 from pymongo import MongoClient
 from selenium.common.exceptions import TimeoutException
 import time
+from datetime import datetime
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
 envir = os.environ
