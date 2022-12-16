@@ -39,7 +39,7 @@ client = MongoClient(envir["mongo_ip"], int(envir["mongo_port"]), username=envir
 db = client.gas_vybory
 
 
-def goThroughUiks(browser, uik, json_candidates):
+def goThroughUiks(browser, uik, json_candidates, lvl=0):
     if len(browser.find_elements(by=By.XPATH, value=uik + '/ul/li/a')) == 0:
         recent_cands = []
         candidates = {_['candidate_id']: _['name'] for _ in json_candidates}
@@ -63,11 +63,11 @@ def goThroughUiks(browser, uik, json_candidates):
             for candidate in recent_cands:
                 candidate['oik_id'] = getOik(browser)
                 if len(list(db.candidates.find({"candidate_id": candidate["candidate_id"]}))) > 0:
-                     continue
+                    continue
                 post_id = db.candidates.insert_one(candidate.copy())
 
     else:
-        browser.find_elements(by=By.XPATH, value=uik)[0].click()
+        browser.find_elements(by=By.XPATH, value=uik)[lvl].click()
         solveCaptcha(browser)
         uik = uik + '/ul/li'
         links = browser.find_elements(by=By.XPATH, value=(uik + '/a'))
@@ -75,10 +75,10 @@ def goThroughUiks(browser, uik, json_candidates):
         for _ in links:
             if str(_.get_attribute('href')) not in "None":
                 linksArr.append(str(_.get_attribute('href')))
-        for _ in linksArr:
-            browser.get(_)
+        for i in range(len(linksArr)):
+            browser.get(linksArr[i])
             solveCaptcha(browser)
-            goThroughUiks(browser, uik, json_candidates)
+            goThroughUiks(browser, uik, json_candidates, i)
 
 
 def getParameterFromQuery(browser, parameter):
