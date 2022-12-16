@@ -1,10 +1,11 @@
 import docker
 
-MONGO_IP = "0.0.0.0"
+MONGO_IP = "178.71.5.69"
 MONGO_PORT = "27017"
 MONGO_USR = "admin"
 MONGO_PWD = "admin"
 LEVEL = "local"
+MAX_CONTAINERS = 6
 
 dd = 1
 mm = 1
@@ -18,8 +19,8 @@ client = docker.from_env()
 container_num = 0
 
 while not (dd < init_end_dd and mm != init_end_mm and yyyy < init_end_yyyy):
-    if len(client.containers.list()) < 6:
-        while len(client.containers.list()) < 6:
+    if len(client.containers.list()) < MAX_CONTAINERS:
+        while len(client.containers.list()) < MAX_CONTAINERS:
             start_dd = str(dd)
             start_mm = str(mm)
             if dd < 10:
