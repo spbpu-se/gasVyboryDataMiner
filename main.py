@@ -328,10 +328,10 @@ def observeData(browser):
     browser.find_element(by=By.XPATH, value='//*[@id="calendar-btn-search"]').click()
     solveCaptcha(browser)
     links = browser.find_elements(by=By.XPATH, value="//a[@href]")
-    links = links[26:]
     linkArr = []
     for link in links:
-        linkArr.append(link.get_attribute('href'))
+        if "vrn" in link.get_attribute('href'):
+            linkArr.append(link.get_attribute('href'))
     print("all %i links are stacked!" % (len(linkArr)))
     for link in linkArr:
         # Кандидаты
