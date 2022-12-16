@@ -301,6 +301,11 @@ def parseCandidates(browser):
         for i in range(len(tableArr)):
             browser.get(tableArr[i])
             solveCaptcha(browser)
+            try:
+                WebDriverWait(browser, 3).until(
+                    EC.presence_of_element_located((By.XPATH, '//*[@id="report-body col"]/div[10]/div/div[2]/table')))
+            except TimeoutException:
+                browser.refresh()
             parseTableByXPATH(browser, '//*[@id="report-body col"]/div[10]/div/div[2]/table', type="candidate",
                               jsn=current_json_candidates[i])
         solveCaptcha(browser)
