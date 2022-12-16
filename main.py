@@ -335,9 +335,9 @@ def observeData(browser):
     print("all %i links are stacked!" % (len(linkArr)))
     for link in linkArr:
         # Кандидаты
-        if os.path.exists(str("output/") + str(link.split('vrn=')[1].split('&')[0]) + str(".json")):
-            continue
         browser.get(link)
+        if db.elections.find_one({"vrn": getParameterFromQuery(browser, "vrn")}) is not None:
+            continue
         solveCaptcha(browser)
         print(link)
         reports_name = browser.find_element(by=By.ID, value="standard-reports-name")
