@@ -15,6 +15,7 @@ init_end_mm = 1
 init_end_yyyy = 2022
 
 client = docker.from_env()
+container_num = 0
 
 while not (dd < init_end_dd and mm != init_end_mm and yyyy < init_end_yyyy):
     if len(client.containers.list()) < 6:
@@ -50,4 +51,10 @@ while not (dd < init_end_dd and mm != init_end_mm and yyyy < init_end_yyyy):
                                                                   "mongo_pwd=" + MONGO_PWD,
                                                                   "level=" + LEVEL,
                                                                   "start_date=" + start_date,
-                                                                  "end_date=" + end_date], detach=True)
+                                                                  "end_date=" + end_date],
+                                                                  name=str(container_num) + "_" + start_date + "_" + end_date,
+                                                                  detach=True)
+
+            print(str(datetime.datetime.now()) + " " + "started container" + str(container_num) + "_" + start_date + "_" + end_date)
+            container_num += 1
+
