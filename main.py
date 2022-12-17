@@ -392,6 +392,19 @@ def observeData(browser):
     browser.get('http://www.vybory.izbirkom.ru/region/izbirkom')
 
 
+def handle_parser(browser):
+    browser.get('http://www.vybory.izbirkom.ru/region/izbirkom')
+    parser(browser)
+    
+    
+def parser(browser):
+    try:
+        observeData(browser)
+    except:
+        time.sleep(5)
+        handle_parser(browser)
+
+
 if __name__ == '__main__':
     option = Options()
     option.add_argument("--disable-infobars")
@@ -401,5 +414,5 @@ if __name__ == '__main__':
     option.headless = not DEBUG
     browser = webdriver.Chrome(options=option)
     browser.get('http://www.vybory.izbirkom.ru/region/izbirkom')
-    observeData(browser)
+    parser(browser)
     browser.close()
