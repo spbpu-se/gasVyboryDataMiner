@@ -1,4 +1,4 @@
-# gas-vybory-parser
+# gasVyboryDataMiner
 
 ## Сборка
 
