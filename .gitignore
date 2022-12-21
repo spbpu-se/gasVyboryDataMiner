@@ -1,0 +1,5 @@
+testScript.py
+.idea
+__pycache__
+captcha.png
+output/*
