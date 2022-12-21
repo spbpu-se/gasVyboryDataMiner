@@ -13,6 +13,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 import jsons
 from urllib.parse import urlparse, parse_qs
 import re
+
 import logging
 import sys
 from sys import platform
@@ -21,6 +22,7 @@ from selenium.common.exceptions import TimeoutException
 import time
 from datetime import datetime
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+
 
 envir = os.environ
 DEBUG = False
