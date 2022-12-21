@@ -1,4 +1,13 @@
-# gas-vybory-parser
+# gasVyboryDataMiner
+
+## Сборка
+
+```bash
+    docker build -t "extractor:latest" . --build-arg start_date="dd.mm.yyyy" --build-arg end_date="dd.mm.yyyy" --build-arg level="local / regional / regcap / federal" --build-arg mongo_ip="0.0.0.0" --build-arg mongo_port="27017" --build-arg mongo_usr="admin" --build-arg mongo_pwd="admin"
+    
+    docker run -e start_date="dd.mm.yyyy" -e end_date="dd.mm.yyyy" -e level="local / regional / regcap / federal" -e mongo_ip="0.0.0.0" -e mongo_port="27017" -e mongo_usr="admin" -e mongo_pwd="admin" extractor:latest
+    
+```
 
 # Сборка контейнера 
 

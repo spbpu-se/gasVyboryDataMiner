@@ -11,12 +11,18 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 import jsons
-import json
 from urllib.parse import urlparse, parse_qs
 import re
+
+import logging
+import sys
 from sys import platform
-from bson import json_util
-from kafka import KafkaProducer
+from pymongo import MongoClient
+from selenium.common.exceptions import TimeoutException
+import time
+from datetime import datetime
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+
 
 envir = os.environ
 DEBUG = False
@@ -30,12 +36,14 @@ election_levels = {
     "local": '//*[starts-with(@id, "select2-urovproved-result-") and "4" = substring(@id, string-length(@id))]'
 }
 
-server = str(envir['kafka_ip']) + str(":") + str(envir['kafka_port'])
-producer = KafkaProducer(bootstrap_servers=server)
+client = MongoClient(envir["mongo_ip"], int(envir["mongo_port"]), username=envir["mongo_usr"],
+                     password=envir["mongo_pwd"])
+db = client.gas_vybory
 
 
-def goThroughUiks(browser, uik, json_candidates):
+def goThroughUiks(browser, uik, json_candidates, lvl=0):
     if len(browser.find_elements(by=By.XPATH, value=uik + '/ul/li/a')) == 0:
+        recent_cands = []
         candidates = {_['candidate_id']: _['name'] for _ in json_candidates}
         table = browser.find_element(by=By.CLASS_NAME, value='table-bordered')
         if table:
@@ -46,16 +54,22 @@ def goThroughUiks(browser, uik, json_candidates):
             for i, cand in enumerate(raw_candidates):
                 for p_id, p_name in candidates.items():
                     if cand[0] == p_name:
+                        temp = next(item for item in json_candidates if item["name"] == p_name)
+                        recent_cands.append(temp)
                         current_json_results["candidates_results"][i] = {'candidate_id': p_id, 'result': int(cand[1])}
                         break
-            saveJson(current_json_results, "vrn_oik_uik")
+            if db.results.find_one(current_json_results.copy()) is not None:
+                return
+            post_id = db.results.insert_one(current_json_results.copy())
 
-            for candidate in json_candidates:
+            for candidate in recent_cands:
                 candidate['oik_id'] = getOik(browser)
-                saveJson(candidate, "vrn_candidate")
+                if len(list(db.candidates.find({"candidate_id": candidate["candidate_id"]}))) > 0:
+                    continue
+                post_id = db.candidates.insert_one(candidate.copy())
 
     else:
-        browser.find_elements(by=By.XPATH, value=uik)[0].click()
+        browser.find_elements(by=By.XPATH, value=uik)[lvl].click()
         solveCaptcha(browser)
         uik = uik + '/ul/li'
         links = browser.find_elements(by=By.XPATH, value=(uik + '/a'))
@@ -63,10 +77,10 @@ def goThroughUiks(browser, uik, json_candidates):
         for _ in links:
             if str(_.get_attribute('href')) not in "None":
                 linksArr.append(str(_.get_attribute('href')))
-        for _ in linksArr:
-            browser.get(_)
+        for i in range(len(linksArr)):
+            browser.get(linksArr[i])
             solveCaptcha(browser)
-            goThroughUiks(browser, uik, json_candidates)
+            goThroughUiks(browser, uik, json_candidates, i)
 
 
 def getParameterFromQuery(browser, parameter):
@@ -75,6 +89,8 @@ def getParameterFromQuery(browser, parameter):
 
 def getOik(browser):
     res = re.findall(r'\d+', browser.find_element(by=By.CLASS_NAME, value='breadcrumb').text)
+    if len(res) == 1:
+        return 0
     return int(res[0]) if res else 0
 
 
@@ -87,7 +103,12 @@ def solveCaptcha(browser):
             check = browser.find_elements(by=By.ID, value="captchaImg")
             if len(check) == 0:
                 break
-            WebDriverWait(browser, 3).until(EC.presence_of_element_located((By.ID, "captchaImg")))
+            print("CAPTCHA!")
+            try:
+                WebDriverWait(browser, 3).until(EC.presence_of_element_located((By.ID, "captchaImg")))
+            except TimeoutException:
+                browser.refresh()
+            time.sleep(1)
             for _ in check:
                 _.screenshot('captcha.png')
             captch = str(pytesseract.image_to_string(Image.open('captcha.png'), config="outputbase digits"))
@@ -103,10 +124,6 @@ def solveCaptcha(browser):
 
 def flatTo2DList(list, rowSize):
     return [[*list[rowSize * i: rowSize * i + rowSize]] for i in range(int(len(list) / rowSize))]
-
-
-def saveJson(jsn, fn):
-    producer.send(fn, json.dumps(jsn, default=json_util.default).encode('utf-8'))
 
 
 def parseTable(browser, table, type='results', table_format="221", jsn=None):
@@ -139,14 +156,6 @@ def parseTable(browser, table, type='results', table_format="221", jsn=None):
 
         if "3" not in rows_data:
             rows_data["3"] = 0
-
-        # before_flag = False
-        # if "досрочно" in raw_rows_data[2][1]:
-        #     before_flag = True
-        # inside_tik = False
-        # if "досрочно " in raw_rows_data[3][1]:
-        #     inside_tik = True
-        tens = [key for key in rows_data.keys() if len(key) == 3]
 
         json_oik = jsons.JsonVrnOik
         json_oik['vrn'] = getParameterFromQuery(browser, "vrn")
@@ -183,7 +192,9 @@ def parseTable(browser, table, type='results', table_format="221", jsn=None):
         if json["uik_id"] == json["oik_id"]:
             json["uik_id"] = 0
         json_oik["uik_id"] = json["uik_id"]
-        saveJson(json_oik, "vrn_oik")
+        if db.districts.find_one(json_oik.copy()) is not None:
+            return json
+        post_id = db.districts.insert_one(json_oik.copy())
         return json
     if type == 'candidates':
         raw_rows_data = flatTo2DList(raw_data, (8 if table_format == "220" else 7))
@@ -221,31 +232,49 @@ def parseTableByXPATH(browser, xpath, type='results', table_format="221", jsn=No
     return parseTable(browser, table, type, table_format, jsn)
 
 
+def extendCandidates(browser, link=None):
+    current_json_candidates = []
+    tableArr = []
+    if link is not None:
+        browser.get(link)
+    tables = ['//*[@id="candidates-221-2"]/tbody', '//*[@id="candidates-220-2"]/tbody']
+    table = browser.find_elements(by=By.XPATH, value='//*[@id="candidates-221-2"]/tbody/tr/td/a')
+    if len(table) <= 0:
+        table = browser.find_elements(by=By.XPATH, value='//*[@id="candidates-221-2"]/tbody/tr/td/nobr/a')
+    table2 = browser.find_elements(by=By.XPATH, value='//*[@id="candidates-220-2"]/tbody/tr/td/a')
+    if len(table2) <= 0:
+        table2 = browser.find_elements(by=By.XPATH, value='//*[@id="candidates-220-2"]/tbody/tr/td/nobr/a')
+    bln = len(browser.find_elements(by=By.XPATH, value=tables[0])) > 0
+    if len(table) <= 0 and len(table2) <= 0:
+        return -1, -1
+    temp = list(parseTableByXPATH(browser, tables[0] if bln else tables[1],
+                                  type="candidates", table_format=("221" if bln else "220")))
+    current_json_candidates.extend(temp)
+    actual_table = table if len(table) > 0 else table2
+    for _ in actual_table:
+        tableArr.append(_.get_attribute('href'))
+    return current_json_candidates, tableArr
+
+
 def parseCandidates(browser):
     tableArr = []
     listsArr = []
     current_json_candidates = []
+    browser.find_element(by=By.XPATH, value="/html/body/div[2]/main/div[2]/div[2]/div[1]/ul/li/a[2]").click()
     if len(browser.find_elements(by=By.XPATH, value='//*[@id="report-body col"]/div[10]/div/div[5]/ul[1]/li/a')) > 0:
+        tempCandidates, tempTable = extendCandidates(browser)
+        if tempCandidates == -1 and tempTable == -1:
+            return "continue"
+        tableArr.extend(tempTable)
+        current_json_candidates.extend(tempCandidates)
         for _ in browser.find_elements(by=By.XPATH, value='//*[@id="report-body col"]/div[10]/div/div[5]/ul[1]/li/a'):
             listsArr.append(_.get_attribute('href'))
         for _ in listsArr:
-            browser.get(_)
-            tables = ['//*[@id="candidates-221-2"]/tbody', '//*[@id="candidates-220-2"]/tbody']
-            table = browser.find_elements(by=By.XPATH, value='//*[@id="candidates-221-2"]/tbody/tr/td/a')
-            if len(table) <= 0:
-                table = browser.find_elements(by=By.XPATH, value='//*[@id="candidates-221-2"]/tbody/tr/td/nobr/a')
-            table2 = browser.find_elements(by=By.XPATH, value='//*[@id="candidates-220-2"]/tbody/tr/td/a')
-            if len(table2) <= 0:
-                table2 = browser.find_elements(by=By.XPATH, value='//*[@id="candidates-220-2"]/tbody/tr/td/nobr/a')
-            bln = len(browser.find_elements(by=By.XPATH, value=tables[0])) > 0
-            if len(table) <= 0 and len(table2) <= 0:
+            tempCandidates, tempTable = extendCandidates(browser, _)
+            if tempCandidates == -1 and tempTable == -1:
                 return "continue"
-            temp = parseTableByXPATH(browser, tables[0] if bln else tables[1],
-                                     type="candidates", table_format=("221" if bln else "220"))
-            current_json_candidates.extend(temp)
-            actual_table = table if len(table) > 0 else table2
-            for _ in actual_table:
-                tableArr.append(_.get_attribute('href'))
+            tableArr.extend(tempTable)
+            current_json_candidates.extend(tempCandidates)
         for i in range(len(tableArr)):
             browser.get(tableArr[i])
             solveCaptcha(browser)
@@ -274,6 +303,11 @@ def parseCandidates(browser):
         for i in range(len(tableArr)):
             browser.get(tableArr[i])
             solveCaptcha(browser)
+            try:
+                WebDriverWait(browser, 3).until(
+                    EC.presence_of_element_located((By.XPATH, '//*[@id="report-body col"]/div[10]/div/div[2]/table')))
+            except TimeoutException:
+                browser.refresh()
             parseTableByXPATH(browser, '//*[@id="report-body col"]/div[10]/div/div[2]/table', type="candidate",
                               jsn=current_json_candidates[i])
         solveCaptcha(browser)
@@ -301,28 +335,18 @@ def observeData(browser):
     browser.find_element(by=By.XPATH, value='//*[@id="calendar-btn-search"]').click()
     solveCaptcha(browser)
     links = browser.find_elements(by=By.XPATH, value="//a[@href]")
-    links = links[26:]
     linkArr = []
     for link in links:
-        linkArr.append(link.get_attribute('href'))
+        if "vrn" in link.get_attribute('href'):
+            linkArr.append(link.get_attribute('href'))
     print("all %i links are stacked!" % (len(linkArr)))
-    # linkArr = ['http://www.vologod.vybory.izbirkom.ru/region/izbirkom?action=show&root_a=1&vrn=4354028286341&region=35&global=&type=0&prver=0&pronetvd=null']
     for link in linkArr:
         # Кандидаты
-        # if os.path.exists(str("output/") + str(link.split('vrn=')[1].split('&')[0]) + str(".json")):
-        #     continue
         browser.get(link)
+        if db.elections.find_one({"vrn": getParameterFromQuery(browser, "vrn")}) is not None:
+            continue
         solveCaptcha(browser)
         print(link)
-        date_of_vote = browser.find_element(by=By.XPATH, value='//*[@id="election-info"]/div/div[3]/div[2]/b').text
-        current_json_vrn = jsons.JsonVrn
-        current_json_vrn["vrn"] = getParameterFromQuery(browser, "vrn")
-        current_json_vrn["title"] = str(
-            browser.find_element(by=By.XPATH, value='//*[@id="election-title"]').text.split('\n')[0])
-        current_json_vrn["level"] = level
-        current_json_vrn["date"] = date_of_vote
-        saveJson(current_json_vrn, "vrn")
-
         reports_name = browser.find_element(by=By.ID, value="standard-reports-name")
         if reports_name.is_displayed() is False:
             continue
@@ -343,28 +367,54 @@ def observeData(browser):
         # УИКи
         browser.get(link)
         solveCaptcha(browser)
+        date_of_vote = browser.find_element(by=By.XPATH, value='//*[@id="election-info"]/div/div[3]/div[2]/b').text
         WebDriverWait(browser, 5).until(EC.presence_of_element_located((By.LINK_TEXT, "Результаты выборов")))
         browser.find_element(by=By.LINK_TEXT, value="Результаты выборов").click()
         solveCaptcha(browser)
         resBtn = browser.find_element(by=By.XPATH, value='//*[@id="election-results"]/table/tbody/tr/td/a')
         if resBtn.text not in (
                 "Результаты выборов", "Результаты выборов по одномандатному (многомандатному) округу",
-                "Данные о предварительных итогах голосования по одномандатному (многомандатному) округу"):
+                "Данные о предварительных итогах голосования по одномандатному (многомандатному) округу",
+                "Результаты выборов по единому мажоритарному округу"):
             continue
         else:
             resBtn.click()
             solveCaptcha(browser)
+
+        current_json_vrn = jsons.JsonVrn
+        current_json_vrn["vrn"] = getParameterFromQuery(browser, "vrn")
+        current_json_vrn["title"] = str(
+            browser.find_element(by=By.XPATH, value='//*[@id="election-title"]').text.split('\n')[0])
+        current_json_vrn["level"] = envir["level"]
+        current_json_vrn["date"] = datetime.strptime(date_of_vote, '%d.%m.%Y')
+        if db.elections.find_one(current_json_vrn.copy()) is not None:
+            continue
+        post_id = db.elections.insert_one(current_json_vrn.copy())
         goThroughUiks(browser, '/html/body/div[2]/main/div[2]/div[2]/div[1]/ul/li', raw_candidates)
     browser.get('http://www.vybory.izbirkom.ru/region/izbirkom')
+
+
+def handle_parser(browser):
+    browser.get('http://www.vybory.izbirkom.ru/region/izbirkom')
+    parser(browser)
+    
+    
+def parser(browser):
+    try:
+        observeData(browser)
+    except:
+        time.sleep(5)
+        handle_parser(browser)
 
 
 if __name__ == '__main__':
     option = Options()
     option.add_argument("--disable-infobars")
     option.add_argument("--disable-blink-features=AutomationControlled")
-
+    option.add_argument("--disable-dev-shm-usage")
+    option.add_argument("--no-sandbox")
     option.headless = not DEBUG
-    browser = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=option)
+    browser = webdriver.Chrome(options=option)
     browser.get('http://www.vybory.izbirkom.ru/region/izbirkom')
-    observeData(browser)
+    parser(browser)
     browser.close()
